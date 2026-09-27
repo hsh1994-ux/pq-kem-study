@@ -45,10 +45,11 @@ SIG_LIST="SIG_ml_dsa_65"
 if [ ! -x "$B/openssl/bin/openssl" ]; then
   log "OpenSSL $OPENSSL_TAG"
   clone https://github.com/openssl/openssl "$OPENSSL_TAG" "$SRC/openssl"
-  (cd "$SRC/openssl" &&
+  # Configure once; make is resumable, so an interrupted build continues.
+  [ -f "$SRC/openssl/Makefile" ] || (cd "$SRC/openssl" &&
     ./Configure --prefix="$B/openssl" --libdir=lib --openssldir="$B/openssl/ssl" \
-      shared no-docs no-tests >/dev/null &&
-    make -j"$JOBS" >/dev/null && make install_sw install_ssldirs >/dev/null)
+      shared no-docs no-tests >/dev/null)
+  (cd "$SRC/openssl" && make -j"$JOBS" >/dev/null && make install_sw install_ssldirs >/dev/null)
 fi
 
 # ---------------------------------------------------------------- liboqs
@@ -58,7 +59,7 @@ build_liboqs() { # build_liboqs <name> <extra cmake args...>
   local name=$1; shift
   [ -f "$B/$name/lib/liboqs.a" ] && return 0
   log "liboqs ($name)"
-  cmake -S "$SRC/liboqs" -B "$B/$name.build" -GNinja \
+  [ -f "$B/$name.build/build.ninja" ] || cmake -S "$SRC/liboqs" -B "$B/$name.build" -GNinja \
     -DCMAKE_INSTALL_PREFIX="$B/$name" -DBUILD_SHARED_LIBS=OFF \
     -DOQS_USE_OPENSSL=OFF -DOQS_DIST_BUILD=OFF \
     -DOQS_MINIMAL_BUILD="$KEM_LIST;$SIG_LIST" "$@" >/dev/null
@@ -76,8 +77,12 @@ build_liboqs liboqs-opt -DCMAKE_BUILD_TYPE=Release -DOQS_OPT_TARGET=auto
 # (values that are legitimately public, e.g. rejection-sampling seeds, are
 # declassified for Valgrind). Optimised (-O3) so we test what ships.
 # Needs Valgrind's headers; skipped with a note if they are missing.
+# Valgrind cannot decode AVX-512, which -march=native emits on recent Xeons,
+# so on x86-64 the CT build targets Haswell (AVX2/BMI2, no AVX-512).
+CT_TARGET=auto
+[ "$ARCH" = x86_64 ] && CT_TARGET=haswell
 if [ -f /usr/include/valgrind/memcheck.h ]; then
-  build_liboqs liboqs-ct -DCMAKE_BUILD_TYPE=Debug -DOQS_OPT_TARGET=auto \
+  build_liboqs liboqs-ct -DCMAKE_BUILD_TYPE=Debug -DOQS_OPT_TARGET="$CT_TARGET" \
     -DOQS_ENABLE_TEST_CONSTANT_TIME=ON -DOQS_ENABLE_TEST_CONSTANT_TIME_OPTIMIZED=ON
 else
   log "Valgrind headers not found: skipping liboqs-ct (E3 Valgrind part needs Docker or apt install valgrind)"
@@ -87,7 +92,7 @@ fi
 if [ ! -f "$B/openssl/lib/ossl-modules/oqsprovider.so" ]; then
   log "oqs-provider $OQSPROVIDER_TAG"
   clone https://github.com/open-quantum-safe/oqs-provider "$OQSPROVIDER_TAG" "$SRC/oqs-provider"
-  cmake -S "$SRC/oqs-provider" -B "$B/oqs-provider.build" -GNinja \
+  [ -f "$B/oqs-provider.build/build.ninja" ] || cmake -S "$SRC/oqs-provider" -B "$B/oqs-provider.build" -GNinja \
     -DCMAKE_BUILD_TYPE=Release -DOPENSSL_ROOT_DIR="$B/openssl" \
     -Dliboqs_DIR="$B/liboqs-opt/lib/cmake/liboqs" >/dev/null
   ninja -C "$B/oqs-provider.build" -j"$JOBS" >/dev/null
@@ -110,5 +115,5 @@ done
 
 # ---------------------------------------------------------------- summary
 log "Done ($ARCH). Optimised implementations in liboqs-opt:"
-grep -hoE 'OQS_ENABLE_KEM_[a-z0-9_]+_(avx2|x86_64|aarch64)' \
+grep -hE '^#define OQS_ENABLE_KEM_[a-z0-9_]+_(avx2|x86_64|aarch64) '  \
   "$B/liboqs-opt/include/oqs/oqsconfig.h" | sort -u || echo "  (none: portable C only)"

@@ -1,0 +1,55 @@
+--- dudect.h (upstream dc269651)	2026-09-27 09:57:32.372017397 +0200
++++ dudect.h (pq-kem-study)	2026-09-27 09:57:32.402269470 +0200
+@@ -71,8 +71,8 @@
+ 
+ #include <stddef.h>
+ #include <stdint.h>
+-#include <emmintrin.h>
+-#include <x86intrin.h>
++/* pq-kem-study patch: portable timer instead of x86-only intrinsics. */
++#include "../../common/cpucycles.h"
+ 
+ #ifdef DUDECT_VISIBLITY_STATIC
+ #define DUDECT_VISIBILITY static
+@@ -278,9 +278,10 @@
+ 
+  Also see https://stackoverflow.com/a/12634857
+ */
+-static inline int64_t cpucycles(void) {
+-  _mm_mfence();
+-  return (int64_t)__rdtsc();
++static inline int64_t dudect_cycles(void) {
++  /* pq-kem-study patch: fenced RDTSC on x86-64, CNTVCT_EL0 on ARM64,
++     CLOCK_MONOTONIC elsewhere (see common/cpucycles.h). */
++  return (int64_t)cpucycles();
+ }
+ 
+ // threshold values for Welch's t-test
+@@ -290,7 +291,7 @@
+ 
+ static void measure(dudect_ctx_t *ctx) {
+   for (size_t i = 0; i < ctx->config->number_measurements; i++) {
+-    ctx->ticks[i] = cpucycles();
++    ctx->ticks[i] = dudect_cycles();
+     do_one_computation(ctx->input_data + i * ctx->config->chunk_size);
+   }
+ 
+@@ -352,6 +353,9 @@
+   return ctx->ttest_ctxs[ret];
+ }
+ 
++/* pq-kem-study patch: last statistics, readable by the harness. */
++double dudect_last_max_t = 0, dudect_last_n = 0;
++
+ static dudect_state_t report(dudect_ctx_t *ctx) {
+ 
+   #if DUDECT_TRACE
+@@ -375,6 +379,8 @@
+   double max_t = fabs(t_compute(t));
+   double number_traces_max_t = t->n[0] +  t->n[1];
+   double max_tau = max_t / sqrt(number_traces_max_t);
++  dudect_last_max_t = max_t;
++  dudect_last_n = number_traces_max_t;
+ 
+   // print the number of measurements of the test that yielded max t.
+   // sometimes you can see this number go down - this can be confusing
