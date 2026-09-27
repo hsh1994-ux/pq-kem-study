@@ -16,3 +16,4 @@ report/*.blg
 report/*.toc
 report/*.pdf
 .DS_Store
+results/raw/*_quick.csv

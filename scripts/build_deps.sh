@@ -24,11 +24,13 @@ log() { printf '\n==> %s\n' "$*"; }
 clone() { # clone <url> <ref> <dir>
   local url=$1 ref=$2 dir=$3
   [ -d "$dir/.git" ] && return 0
+  rm -rf "$dir.part" # left over from an interrupted clone
   if git ls-remote --exit-code --tags --heads "$url" "$ref" >/dev/null 2>&1; then
-    git clone -q --depth 1 --branch "$ref" "$url" "$dir"
+    git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "$url" "$dir.part"
   else # a commit hash
-    git clone -q "$url" "$dir" && git -C "$dir" checkout -q "$ref"
+    git clone -q "$url" "$dir.part" && git -C "$dir.part" checkout -q "$ref"
   fi
+  mv "$dir.part" "$dir" # only a complete clone gets the final name
 }
 
 # Only the KEMs we study, to keep build time down.
@@ -70,9 +72,16 @@ build_liboqs liboqs-ref -DCMAKE_BUILD_TYPE=Release -DOQS_OPT_TARGET=generic \
   -DOQS_USE_AVX2_INSTRUCTIONS=OFF -DOQS_USE_ARM_NEON_INSTRUCTIONS=OFF
 # opt: everything this CPU supports.
 build_liboqs liboqs-opt -DCMAKE_BUILD_TYPE=Release -DOQS_OPT_TARGET=auto
-# ct: liboqs' own Valgrind constant-time test harness (needs Debug build).
-build_liboqs liboqs-ct -DCMAKE_BUILD_TYPE=Debug -DOQS_OPT_TARGET=auto \
-  -DOQS_ENABLE_TEST_CONSTANT_TIME=ON
+# ct: same as opt, but with liboqs' constant-time annotations compiled in
+# (values that are legitimately public, e.g. rejection-sampling seeds, are
+# declassified for Valgrind). Optimised (-O3) so we test what ships.
+# Needs Valgrind's headers; skipped with a note if they are missing.
+if [ -f /usr/include/valgrind/memcheck.h ]; then
+  build_liboqs liboqs-ct -DCMAKE_BUILD_TYPE=Debug -DOQS_OPT_TARGET=auto \
+    -DOQS_ENABLE_TEST_CONSTANT_TIME=ON -DOQS_ENABLE_TEST_CONSTANT_TIME_OPTIMIZED=ON
+else
+  log "Valgrind headers not found: skipping liboqs-ct (E3 Valgrind part needs Docker or apt install valgrind)"
+fi
 
 # ---------------------------------------------------------------- oqs-provider
 if [ ! -f "$B/openssl/lib/ossl-modules/oqsprovider.so" ]; then
