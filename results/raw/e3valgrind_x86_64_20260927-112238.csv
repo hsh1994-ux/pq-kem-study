@@ -1,0 +1,25 @@
+# date=2026-09-27T09:22:38Z
+# host=vm
+# arch=x86_64
+# cpu=Intel(R) Xeon(R) Processor @ 2.80GHz
+# cores=2
+# kernel=6.18.44-fc-v37
+# virtualisation=docker
+# cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+# liboqs=0.16.0
+# openssl=openssl-3.5.8
+# oqs_provider=0.12.0-rc2
+# repo_commit=2807f04
+alg,errors_raw,contexts_raw,errors_after_upstream_suppressions,upstream_known_issue,valgrind_crashed,functions
+ML-KEM-512,0,0,0,False,False,
+HQC-1,32488,9,0,True,False,PQCHQC_HQC1_C_vect_generate_random_support1;find_peaks
+FrodoKEM-640-SHAKE,0,0,0,False,False,
+Classic-McEliece-348864,2089122,34,0,True,False,PQCLEAN_MCELIECE348864_AVX2_genpoly_gen;PQCLEAN_MCELIECE348864_AVX2_pk_gen;to_bitslicing_2x;composeinv;PQCLEAN_MCELIECE348864_AVX2_controlbitsfrompermutation;gen_e
+ML-KEM-768,0,0,0,False,False,
+HQC-3,48986,9,0,True,False,PQCHQC_HQC3_C_vect_generate_random_support1;find_peaks
+FrodoKEM-976-SHAKE,0,0,0,False,False,
+Classic-McEliece-460896,10000000,20,0,True,False,PQCLEAN_MCELIECE460896_AVX2_genpoly_gen;PQCLEAN_MCELIECE460896_AVX2_pk_gen;to_bitslicing_2x;vec256_cswap
+ML-KEM-1024,0,0,0,False,False,
+HQC-5,80844,9,0,True,False,PQCHQC_HQC5_C_vect_generate_random_support1;find_peaks
+FrodoKEM-1344-SHAKE,0,0,0,False,False,
+Classic-McEliece-6688128,10000000,18,0,True,False,PQCLEAN_MCELIECE6688128_AVX2_genpoly_gen;PQCLEAN_MCELIECE6688128_AVX2_pk_gen;to_bitslicing_2x
