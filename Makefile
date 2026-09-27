@@ -12,18 +12,22 @@ OQS_LINK = $(OQS)/lib/liboqs.a -lpthread
 HDRS     = $(wildcard common/*.h)
 
 TIERS    = ref opt
-TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t))
+OSSL     = $(BUILD_DIR)/openssl
+OSSL_LINK = -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lcrypto
+TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl
 
-.PHONY: help deps tools sysinfo kat clean distclean
+.PHONY: help deps tools sysinfo kat bench clean distclean
 
 help:
 	@echo "Targets:"
 	@echo "  deps       build OpenSSL 3.5, liboqs (ref/opt/ct) and oqs-provider into \$$BUILD_DIR"
 	@echo "  tools      compile the C harnesses in bin/"
 	@echo "  kat        E4: correctness and interoperability checks"
+	@echo "  bench      E1: keygen/encaps/decaps timing, sizes, stack (COOLDOWN=30 on laptops)"
 	@echo "  sysinfo    print the machine metadata recorded in every results file"
 	@echo "  clean      remove compiled tools (keeps dependencies)"
 	@echo "  distclean  remove everything in \$$BUILD_DIR"
+	@echo "Add QUICK=1 to any experiment for a fast smoke test (not for the report)."
 
 deps:
 	scripts/build_deps.sh
@@ -34,8 +38,19 @@ bin/kemtool-%: kat/kemtool.c $(HDRS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) -DBUILD_TIER='"$*"' -I$(OQS)/include $< -o $@ $(OQS_LINK)
 
+bin/bench_kem-%: bench/bench_kem.c $(HDRS)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) -DBUILD_TIER='"$*"' -I$(OQS)/include $< -o $@ $(OQS_LINK)
+
+bin/bench_ossl: bench/bench_ossl.c $(HDRS)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) -I$(OSSL)/include $< -o $@ $(OSSL_LINK)
+
 kat: tools
 	kat/run_e4.py
+
+bench: tools
+	bench/run_e1.py
 
 sysinfo:
 	@scripts/sysinfo.sh
