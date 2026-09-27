@@ -69,15 +69,42 @@ def save(fig, name):
     print(f"  figures/{name}.pdf")
 
 
+def tex_escape(v) -> str:
+    s = str(v)
+    for a, b in (("\\", r"\textbackslash{}"), ("&", r"\&"), ("%", r"\%"), ("$", r"\$"),
+                 ("#", r"\#"), ("_", r"\_"), ("{", r"\{"), ("}", r"\}"), ("~", r"\textasciitilde{}")):
+        s = s.replace(a, b)
+    return s
+
+
 def write_tex(name, df, caption, label, fmt=None):
-    TAB.mkdir(parents=True, exist_ok=True)
-    tex = df.to_latex(index=False, escape=True, float_format=fmt or (lambda x: f"{x:,.1f}"),
-                      caption=caption.replace("_", r"\_"), label=label.replace("_", "-"),
-                      position="htbp", na_rep="--")
+    """Booktabs table without pandas' Styler (which needs a recent jinja2)."""
+    fmt = fmt or (lambda x: f"{x:,.1f}")
+
+    def cell(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)) or v is pd.NA:
+            return "--"
+        if isinstance(v, bool):
+            return "yes" if v else "no"
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return tex_escape(fmt(v))
+        return tex_escape(v)
+
+    num = [pd.api.types.is_numeric_dtype(df[c]) and not pd.api.types.is_bool_dtype(df[c]) for c in df.columns]
+    cap = caption.replace("_", "\\_")  # captions may hold math ($\mu$s), so only _ is escaped
+    lab = label.replace("_", "-")
+    cols = "".join("r" if n else "l" for n in num)
+    lines = [r"\begin{table}[htbp]", r"\centering", r"\caption{" + cap + "}", r"\label{" + lab + "}"]
+    tab = [r"\begin{tabular}{" + cols + "}", r"\toprule",
+           " & ".join(tex_escape(c) for c in df.columns) + r" \\", r"\midrule"]
+    tab += [" & ".join(cell(v) for v in row) + r" \\" for row in df.itertuples(index=False)]
+    tab += [r"\bottomrule", r"\end{tabular}"]
     if len(df.columns) >= 5:  # keep wide tables inside the text block
-        tex = tex.replace("\\begin{tabular}", "\\resizebox{\\linewidth}{!}{\\begin{tabular}")
-        tex = tex.replace("\\end{tabular}", "\\end{tabular}}")
-    (TAB / f"{name}.tex").write_text(tex)
+        tab[0] = r"\resizebox{\linewidth}{!}{" + tab[0]
+        tab[-1] += "}"
+    lines += tab + [r"\end{table}", ""]
+    TAB.mkdir(parents=True, exist_ok=True)
+    (TAB / f"{name}.tex").write_text("\n".join(lines))
     print(f"  report/tables/{name}.tex")
 
 
