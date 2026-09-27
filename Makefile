@@ -14,9 +14,9 @@ HDRS     = $(wildcard common/*.h)
 TIERS    = ref opt
 OSSL     = $(BUILD_DIR)/openssl
 OSSL_LINK = -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lcrypto
-TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl
+TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl bin/hs_client
 
-.PHONY: help deps tools sysinfo kat bench clean distclean
+.PHONY: help deps tools sysinfo kat bench tls clean distclean
 
 help:
 	@echo "Targets:"
@@ -24,6 +24,7 @@ help:
 	@echo "  tools      compile the C harnesses in bin/"
 	@echo "  kat        E4: correctness and interoperability checks"
 	@echo "  bench      E1: keygen/encaps/decaps timing, sizes, stack (COOLDOWN=30 on laptops)"
+	@echo "  tls        E2: TLS 1.3 handshakes under emulated RTT/loss (rootless netns)"
 	@echo "  sysinfo    print the machine metadata recorded in every results file"
 	@echo "  clean      remove compiled tools (keeps dependencies)"
 	@echo "  distclean  remove everything in \$$BUILD_DIR"
@@ -46,11 +47,18 @@ bin/bench_ossl: bench/bench_ossl.c $(HDRS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) -I$(OSSL)/include $< -o $@ $(OSSL_LINK)
 
+bin/hs_client: tls/hs_client.c $(HDRS)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) -I$(OSSL)/include $< -o $@ -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lssl -lcrypto
+
 kat: tools
 	kat/run_e4.py
 
 bench: tools
 	bench/run_e1.py
+
+tls: tools
+	tls/run_e2.py
 
 sysinfo:
 	@scripts/sysinfo.sh
