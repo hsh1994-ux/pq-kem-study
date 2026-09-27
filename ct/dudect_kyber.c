@@ -26,7 +26,8 @@
 #endif
 
 static uint8_t pk[CRYPTO_PUBLICKEYBYTES], sk[CRYPTO_SECRETKEYBYTES];
-static uint8_t ct0[CRYPTO_CIPHERTEXTBYTES], ss[CRYPTO_BYTES];
+static uint8_t ct0[CRYPTO_CIPHERTEXTBYTES], ct1[CRYPTO_CIPHERTEXTBYTES], ss[CRYPTO_BYTES];
+static int fixed_fixed; /* see dudect_kem.c for fr/ff */
 
 uint8_t do_one_computation(uint8_t *data) {
     crypto_kem_dec(ss, data, sk);
@@ -39,13 +40,17 @@ void prepare_inputs(dudect_config_t *c, uint8_t *input_data, uint8_t *classes) {
     for (size_t i = 0; i < c->number_measurements; i++) {
         classes[i] = randombit();
         if (classes[i] == 0) memcpy(input_data + i * c->chunk_size, ct0, c->chunk_size);
+        else if (fixed_fixed) memcpy(input_data + i * c->chunk_size, ct1, c->chunk_size);
     }
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) die("usage: dudect_kyber SECONDS");
+    if (argc != 2 && argc != 3) die("usage: dudect_kyber SECONDS [fr|ff]");
+    fixed_fixed = argc == 3 && !strcmp(argv[2], "ff");
     crypto_kem_keypair(pk, sk);
     crypto_kem_enc(ct0, ss, pk);
-    return dudect_run("kyber-ref", "Kyber768-" KYBER_VARIANT, "decaps", CRYPTO_CIPHERTEXTBYTES,
+    crypto_kem_enc(ct1, ss, pk);
+    return dudect_run("kyber-ref", "Kyber768-" KYBER_VARIANT, fixed_fixed ? "decaps-ff" : "decaps",
+                      CRYPTO_CIPHERTEXTBYTES,
                       atof(argv[1]), 10000);
 }

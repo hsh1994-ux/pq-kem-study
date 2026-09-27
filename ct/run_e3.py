@@ -38,6 +38,12 @@ DEFAULT_E3_KEMS = ["ML-KEM-512", "ML-KEM-768", "ML-KEM-1024", "HQC-1",
                    "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"]
 KYBER_OPTS = ["O0", "Os", "O2", "O3"]
 DUDECT_FIELDS = ["tier", "target", "op", "timer", "measurements", "max_t", "verdict", "seconds"]
+# A dudect run stops at the first |t| > 10, so one crossing is weak evidence.
+# Rule used here: a flagged KEM target is re-run independently; it is reported
+# as "leak" only if the re-run is flagged too, otherwise "inconclusive". A
+# replicated fixed-vs-random leak is followed by a fixed-vs-fixed run (two
+# different valid ciphertexts) to separate data-dependent timing from
+# "repeated vs varied input" effects.
 DIV_RE = re.compile(r"\t(i?div[bwlq]?|[us]div)\s")
 FN_RE = re.compile(r"^[0-9a-f]+ <([^>]+)>:$")
 
@@ -46,17 +52,45 @@ def budget(default):
     return float(os.environ.get("DUDECT_SECONDS", 5 if pqlib.QUICK else default))
 
 
-def dudect(cmd, extra=None):
+def dudect_once(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True)
     line = next((l for l in r.stdout.splitlines() if l.startswith("RESULT,")), None)
     if not line:
         print(f"  ! {' '.join(cmd)} failed: {r.stderr.strip()[:200]}")
         return None
     row = dict(zip(DUDECT_FIELDS, line.split(",")[1:]))
-    row.update(extra or {})
-    print(f"  {row['tier']:<9} {row['target']:<28} {row['verdict']:<13} "
-          f"|t|={float(row['max_t']):7.2f}  n={int(float(row['measurements'])):>9}  {row['seconds']}s")
+    n = float(row["measurements"])
+    row["tau"] = f"{float(row['max_t']) / n ** 0.5:.4f}" if n > 0 else ""  # effect size, n-independent
     return row
+
+
+def show(row, note=""):
+    print(f"  {row['tier']:<9} {row['target']:<28} {row['op']:<9} {row['verdict']:<13} "
+          f"|t|={float(row['max_t']):7.2f}  n={int(float(row['measurements'])):>9}  {row['seconds']}s {note}")
+
+
+def dudect(cmd, extra=None, replicate=True, follow_up=None):
+    """One target; replicate a flag, then optionally a fixed-vs-fixed follow-up."""
+    row = dudect_once(cmd)
+    if not row:
+        return []
+    row.update(extra or {})
+    row["replicate_max_t"] = ""
+    rows = [row]
+    if replicate and row["verdict"] == "leak":
+        again = dudect_once(cmd)
+        if again:
+            row["replicate_max_t"] = again["max_t"]
+            row["verdict"] = "leak" if again["verdict"] == "leak" else "inconclusive"
+    show(row, f"(replicate |t|={row['replicate_max_t']})" if row["replicate_max_t"] else "")
+    if follow_up and row["verdict"] == "leak":
+        ff = dudect_once(follow_up)
+        if ff:
+            ff.update(extra or {})
+            ff["replicate_max_t"] = ""
+            show(ff, "<- fixed-vs-fixed follow-up")
+            rows.append(ff)
+    return rows
 
 
 # ------------------------------------------------------------------ dudect
@@ -64,9 +98,8 @@ def run_dudect(kems):
     rows = []
     print("Controls (planted leak must be detected):")
     for mode in ("leaky", "ct"):
-        r = dudect([str(pqlib.BIN / "dudect_planted"), mode, str(budget(30))], {"opt_level": "O2"})
-        if r:
-            rows.append(r)
+        rows += dudect([str(pqlib.BIN / "dudect_planted"), mode, str(budget(30))], {"opt_level": "O2"},
+                       replicate=False)
     leaky = next((r for r in rows if r["target"] == "planted-leaky-memcmp"), None)
     if not leaky or leaky["verdict"] != "leak":
         print("  !! planted leak NOT detected: timing results on this machine are not trustworthy")
@@ -74,17 +107,15 @@ def run_dudect(kems):
     print("liboqs decapsulation (fixed vs random ciphertext):")
     for tier in pqlib.TIERS:
         for alg in kems:
-            r = dudect([str(pqlib.BIN / f"dudect_kem-{tier}"), alg, str(budget(60))], {"opt_level": "O3"})
-            if r:
-                rows.append(r)
+            exe, b = str(pqlib.BIN / f"dudect_kem-{tier}"), str(budget(60))
+            rows += dudect([exe, alg, b], {"opt_level": "O3"}, follow_up=[exe, alg, b, "ff"])
 
     print("KyberSlash control (pq-crystals Kyber768 ref, before/after fix):")
     for variant in ("old", "fixed"):
         for opt in KYBER_OPTS:
             exe = pqlib.BIN / f"dudect-kyber-{variant}-{opt}"
-            r = dudect([str(exe), str(budget(60))], {"opt_level": opt})
-            if r:
-                rows.append(r)
+            rows += dudect([str(exe), str(budget(60))], {"opt_level": opt},
+                           follow_up=[str(exe), str(budget(60)), "ff"])
     return rows
 
 

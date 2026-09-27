@@ -192,7 +192,8 @@ def e3():
         for c, (arch, d) in enumerate(sorted(runs.items())):
             ax = axes[0][c]
             d = d.iloc[::-1].reset_index(drop=True)
-            labels = [f"{t} {short(x)}" for t, x in zip(d.tier, d.target)]
+            labels = [f"{t} {short(x)}" + (" (fixed-vs-fixed)" if str(o).endswith("-ff") else "")
+                      for t, x, o in zip(d.tier, d.target, d.op)]
             colors = [TIER_COLOR.get(t, INK2) for t in d.tier]
             ax.scatter(d.max_t.clip(lower=0.1), range(len(d)), s=18, c=colors, zorder=3)
             for thr, name in ((4.5, "4.5"), (10, "10: leak")):
