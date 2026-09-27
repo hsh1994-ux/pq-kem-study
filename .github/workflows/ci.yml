@@ -1,0 +1,23 @@
+# Builds the toolchain and runs the E4 correctness checks on x86-64 and ARM64
+# for every push. Timing experiments are not run in CI (shared runners are
+# far too noisy for E1-E3); those come from `make all` on real machines.
+name: ci
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  correctness:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build valgrind python3-pandas
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: deps-${{ matrix.runner }}-${{ hashFiles('versions.env', 'scripts/build_deps.sh') }}
+      - run: make deps
+      - run: make kat QUICK=1
+      - run: QUICK=1 DUDECT_SECONDS=5 E3_KEMS=ML-KEM-768 make ct

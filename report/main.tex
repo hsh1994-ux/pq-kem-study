@@ -1,0 +1,115 @@
+% Final report skeleton -- Cybersecurity Lab 1, ELTE.
+% Build: make report   (runs analysis/make_figures.py first, then latexmk)
+% Tables in tables/ and figures in ../figures/ are generated from results/raw/;
+% never edit them by hand -- re-run the analysis instead.
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{microtype,booktabs,graphicx,amsmath,hyperref,xcolor}
+\usepackage[capitalise]{cleveref}
+\graphicspath{{../figures/}}
+\newcommand{\todo}[1]{\textcolor{red!70!black}{[TODO: #1]}}
+% Include a generated table if it exists, otherwise a placeholder.
+\newcommand{\gentable}[1]{\IfFileExists{tables/#1.tex}{\input{tables/#1.tex}}{\todo{run the experiment to generate \detokenize{#1}}}}
+\newcommand{\genfigure}[3]{\IfFileExists{../figures/#1.pdf}{%
+  \begin{figure}[htbp]\centering\includegraphics[width=#2\linewidth]{#1}\caption{#3}\label{fig:#1}\end{figure}}%
+  {\todo{run the experiment to generate figure \detokenize{#1}}}}
+
+\title{A Comparative Study of Post-Quantum Key-Encapsulation Mechanisms\\and Their Implementations}
+\author{Hamdan Al-Jabri\\ELTE Faculty of Informatics, Cybersecurity Lab 1}
+\date{Autumn 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\todo{150 words: the problem, what was compared, the four headline results (one per RQ), the takeaway.}
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+\todo{Harvest-now-decrypt-later; NIST standardisation (FIPS 203 in Aug 2024, HQC selected Mar 2025); why
+implementation matters as much as the algorithm.}
+
+Research questions:
+\begin{description}
+  \item[RQ1 Cost] How do keygen, encapsulation and decapsulation compare in time, object size and stack use
+    across families and security levels, and does implementation optimisation change the ranking?
+  \item[RQ2 Deployability] What does each KEM add to a TLS 1.3 handshake in latency and bytes on the wire
+    under realistic delay and loss?
+  \item[RQ3 Implementation security] Do the tested builds show secret-dependent timing, and can a known flaw
+    (KyberSlash) be detected with the same tooling?
+  \item[RQ4 Correctness] Do independent implementations agree on official test vectors and interoperate?
+\end{description}
+\todo{Contributions paragraph.}
+
+\section{Background}\label{sec:background}
+\subsection{KEMs and IND-CCA2 security}
+\todo{Definition; Fujisaki--Okamoto transform; implicit rejection.}
+\subsection{The four families}
+\todo{ML-KEM (Module-LWE), FrodoKEM (plain LWE), HQC (quasi-cyclic codes), Classic McEliece (binary Goppa
+codes); hardness assumptions; decryption-failure rates; standardisation status.}
+\subsection{Timing side channels}
+\todo{Constant-time programming; compiler-introduced leaks; KyberSlash (secret-dependent division).}
+
+\section{Related work}\label{sec:related}
+\todo{Earlier benchmark studies (eBACS/SUPERCOP, pqm4, liboqs profiling); TLS experiments by Cloudflare and
+Google; dudect, ctgrind/TIMECOP, KyberSlash.}
+
+\section{Methodology}\label{sec:method}
+\subsection{Implementations and platforms}
+\todo{liboqs 0.16.0 ref (portable C) and opt (AVX2 on x86-64, NEON on ARM64) builds; OpenSSL 3.5.8;
+oqs-provider 0.12.0-rc2; the two machines (\texttt{make sysinfo}); pinned versions in \texttt{versions.env}.}
+\subsection{E1 microbenchmarks}
+\todo{Per-call timing with the portable timer (RDTSC / CNTVCT\_EL0), median and IQR, warm-up, CPU pinning,
+cool-down on the fanless laptop, stack painting.}
+\subsection{E2 TLS handshakes}
+\todo{Rootless network namespace, loopback MTU 1500, \texttt{tc netem} delay and loss, one group offered per
+handshake, ECDSA P-256 certificate, bytes from \texttt{tcp\_info}.}
+\subsection{E3 constant-time analysis}
+\todo{dudect fixed-vs-random decapsulation with planted positive/negative controls; KyberSlash control at four
+optimisation levels plus a static DIV scan; Valgrind with random bytes marked secret, compared against liboqs'
+known-issue list. Note the dead-code pitfall found and fixed in the harness.}
+\subsection{E4 correctness}
+\todo{liboqs KATs, NIST ACVP FIPS 203 vectors, cross-build and liboqs$\leftrightarrow$OpenSSL interop.}
+\subsection{Threats to validity}
+\todo{Single machine per architecture; VM timer resolution on ARM (41.7\,ns ticks); Turbo Boost / thermal
+throttling; dudect ``no evidence'' is not proof; netem on loopback is not a real network.}
+
+\section{Results}\label{sec:results}
+\subsection{RQ1: cost}
+\genfigure{fig_e1_ops}{1.0}{Median time per operation (log scale).}
+\gentable{tab_sizes}
+\todo{Interpret: ranking, effect of optimisation per family, OpenSSL vs liboqs ML-KEM, x86 vs ARM.}
+
+\subsection{RQ2: deployability in TLS}
+\genfigure{fig_e2_handshake}{1.0}{Median TLS 1.3 handshake time per group.}
+\gentable{tab_e2_bytes}
+\todo{Interpret: bytes vs packets vs latency; loss sensitivity; why Classic McEliece has no TLS group
+(key share limited to 65{,}535 bytes).}
+
+\subsection{RQ3: implementation security}
+\genfigure{fig_e3_dudect}{0.8}{dudect maximum $|t|$ per target; 10 is the leak threshold.}
+\gentable{tab_e3_valgrind_x86_64}
+\gentable{tab_e3_divscan_x86_64}
+\gentable{tab_e3_divscan_aarch64}
+\todo{Interpret: controls first; KEM verdicts; KyberSlash compiler/CPU dependence; Valgrind vs upstream issues.}
+
+\subsection{RQ4: correctness}
+\gentable{tab_e4_x86_64}
+\gentable{tab_e4_aarch64}
+\todo{All checks passed / any failures.}
+
+\section{Discussion}\label{sec:discussion}
+\todo{Which KEM fits which use case (TLS, VPN, embedded, long-term static keys); hybrid vs pure; surprises.}
+
+\section{Limitations and future work}\label{sec:limits}
+\todo{Power/EM side channels, fault injection, embedded targets (pqm4), more CPUs.}
+
+\section{Conclusion}\label{sec:conclusion}
+\todo{One answer per RQ.}
+
+\appendix
+\section{Reproducing the results}
+All numbers come from \url{https://github.com/<your-account>/pq-kem-study} at the commit recorded in each CSV
+header: \texttt{make deps \&\& make all}.
+
+\end{document}

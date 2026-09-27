@@ -17,7 +17,7 @@ OSSL_LINK = -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lcrypto
 TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl bin/hs_client \
            $(foreach t,$(TIERS),bin/dudect_kem-$(t)) bin/dudect_planted
 
-.PHONY: help deps tools sysinfo kat bench tls ct kyber clean distclean
+.PHONY: help deps tools sysinfo kat bench tls ct kyber figures report all quick demo clean distclean
 
 help:
 	@echo "Targets:"
@@ -27,6 +27,11 @@ help:
 	@echo "  bench      E1: keygen/encaps/decaps timing, sizes, stack (COOLDOWN=30 on laptops)"
 	@echo "  tls        E2: TLS 1.3 handshakes under emulated RTT/loss (rootless netns)"
 	@echo "  ct         E3: dudect timing tests, KyberSlash control, DIV scan, Valgrind"
+	@echo "  figures    figures/ and report/tables/ from the newest results"
+	@echo "  report     figures + report/main.pdf (needs LaTeX)"
+	@echo "  all        kat bench tls ct figures (the full study, ~1-2 h)"
+	@echo "  quick      the same as smoke tests (~10 min, results not for the report)"
+	@echo "  demo       the mini-conference demo"
 	@echo "  sysinfo    print the machine metadata recorded in every results file"
 	@echo "  clean      remove compiled tools (keeps dependencies)"
 	@echo "  distclean  remove everything in \$$BUILD_DIR"
@@ -75,6 +80,21 @@ tls: tools
 
 ct: tools kyber
 	ct/run_e3.py
+
+figures:
+	analysis/make_figures.py
+
+report: figures
+	cd report && latexmk -pdf -interaction=nonstopmode -quiet main.tex
+
+all: kat bench tls ct figures
+
+quick:
+	$(MAKE) kat bench tls ct QUICK=1
+	INCLUDE_QUICK=1 analysis/make_figures.py
+
+demo: tools kyber
+	demo/demo.sh
 
 sysinfo:
 	@scripts/sysinfo.sh
