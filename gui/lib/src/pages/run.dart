@@ -145,7 +145,7 @@ class _RunPageState extends State<RunPage> {
     unawaited(widget.runner.start(what, plan, mode: cfg.mode, wslDistro: cfg.wslDistro));
   }
 
-  Widget _field(String label, TextEditingController c, {String? hint, double width = 150}) {
+  Widget _field(String label, TextEditingController c, {String? hint, double width = 180}) {
     return SizedBox(
       width: width,
       child: TextField(
@@ -224,19 +224,92 @@ class _RunPageState extends State<RunPage> {
                 ),
             ]),
           ),
-          ControlRow(
-            'Options',
-            Wrap(spacing: 12, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Switch(value: _quick, onChanged: busy ? null : (v) => setState(() => _quick = v)),
-                const Text('Quick smoke test'),
-              ]),
-              _field('Cooldown (s)', _cooldown, hint: '0', width: 120),
-              _field('N_OPS', _nOps, hint: '1000', width: 110),
-              _field('McEliece keygens', _nMce, hint: '20', width: 150),
-              _field('dudect seconds', _dudect, hint: '60', width: 140),
-              _field('Only these KEMs', _kems, hint: 'ML-KEM-768,HQC-1', width: 240),
-              _field('Other variables', _extra, hint: 'PIN_CPU=2 WARMUP_MS=300', width: 260),
+          const Divider(height: 24),
+          Text('Options', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text('Leave a box empty to use the default. Values apply to the experiments listed under each name.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          _OptionRow(
+            name: 'Quick smoke test',
+            variable: 'QUICK=1',
+            usedBy: 'all',
+            input: Row(mainAxisSize: MainAxisSize.min, children: [
+              Switch(value: _quick, onChanged: busy ? null : (v) => setState(() => _quick = v)),
+              Text(_quick ? 'on' : 'off'),
+            ]),
+            help: 'Runs every experiment with very few iterations, only to check that everything works '
+                '(all four in ~10 min). Files are saved with a _quick suffix and are not used for the report; '
+                'the viewer hides them unless you tick "show quick runs". Leave off for real measurements.',
+          ),
+          _OptionRow(
+            name: 'Cooldown',
+            variable: 'COOLDOWN',
+            usedBy: 'E1',
+            input: _field('seconds', _cooldown, hint: '0'),
+            help: 'Pause between KEMs in E1. A fanless laptop (MacBook Air) heats up during long benchmarks and '
+                'lowers its clock speed, which would make later KEMs look slower than they are; the pause lets it '
+                'cool down. 30 s is a good value on laptops; it adds about 15 min (29 pauses). Default 0.',
+          ),
+          _OptionRow(
+            name: 'Timed calls per operation',
+            variable: 'N_OPS',
+            usedBy: 'E1',
+            input: _field('calls', _nOps, hint: '1000'),
+            help: 'How many times each keygen, encaps and decaps is timed. The median of these is the number in '
+                'the results; more calls give a steadier median but take longer. Default 1000 (50 in quick mode).',
+          ),
+          _OptionRow(
+            name: 'McEliece key generations',
+            variable: 'N_MCE_KEYGEN',
+            usedBy: 'E1',
+            input: _field('keygens', _nMce, hint: '20'),
+            help: 'Classic McEliece key generation is slow (30–500 ms each) and varies a lot, because it retries '
+                'until a random matrix works, so it gets its own count. 20 is enough for a rough median; 100 '
+                'gives a more reliable one (a few extra minutes). Default 20 (2 in quick mode).',
+          ),
+          _OptionRow(
+            name: 'dudect time per target',
+            variable: 'DUDECT_SECONDS',
+            usedBy: 'E3',
+            input: _field('seconds', _dudect, hint: '60'),
+            help: 'How long dudect measures each target (controls, each KEM in each build, each Kyber variant: '
+                'about 22 targets, plus re-runs of anything flagged). Longer runs can detect smaller timing '
+                'differences. Default 60 s, i.e. ~25 min for E3 (5 s in quick mode).',
+          ),
+          _OptionRow(
+            name: 'Only these KEMs',
+            variable: 'KEMS, E3_KEMS',
+            usedBy: 'E1, E3, E4',
+            input: _field('names', _kems, hint: 'ML-KEM-768,HQC-1', width: 220),
+            help: 'Comma-separated liboqs names to test only some KEMs, e.g. to repeat one measurement. Empty = '
+                'all 12 KEMs in kems.conf (E3 defaults to the level-1 KEMs plus all ML-KEM sizes). Names: '
+                'ML-KEM-512/768/1024, HQC-1/3/5, FrodoKEM-640/976/1344-SHAKE, Classic-McEliece-348864/460896/6688128.',
+          ),
+          _OptionRow(
+            name: 'Other variables',
+            variable: 'KEY=VALUE …',
+            usedBy: 'any',
+            input: _field('KEY=VALUE', _extra, hint: 'PIN_CPU=2', width: 220),
+            help: 'Anything else the scripts read, separated by spaces (no spaces inside a value). '
+                'Click one below to add it with its default value, then edit it.',
+            extra: Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final v in _moreVars)
+                Tooltip(
+                  message: '${v.help}\nDefault: ${v.example.split('=').last}',
+                  child: ActionChip(
+                    label: Text('${v.example.split('=').first} · ${v.usedBy}'),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() {
+                              final key = v.example.split('=').first;
+                              final cur = parseEnvText(_extra.text);
+                              if (!cur.containsKey(key)) {
+                                _extra.text = [_extra.text.trim(), v.example].where((x) => x.isNotEmpty).join(' ');
+                              }
+                            }),
+                  ),
+                ),
             ]),
           ),
           const SizedBox(height: 8),
@@ -327,6 +400,86 @@ class _RunPageState extends State<RunPage> {
         ]),
       ),
     ]);
+  }
+}
+
+class _Var {
+  const _Var(this.example, this.usedBy, this.help);
+  final String example;
+  final String usedBy;
+  final String help;
+}
+
+const _moreVars = [
+  _Var('PIN_CPU=1', 'E1', 'Which CPU core E1 runs on (pinned with taskset so the OS does not move it between cores). '
+      'Empty disables pinning.'),
+  _Var('WARMUP_MS=200', 'E1', 'Busy-wait before the first timed call so the core is at full clock speed '
+      '(the M4 needs ~90 ms to ramp up after idle).'),
+  _Var('N_HS=200', 'E2', 'TLS handshakes per group and network setting (10 in quick mode).'),
+  _Var('RTTS=0,50,200', 'E2', 'Round-trip delays to emulate, in ms (tc netem).'),
+  _Var('LOSSES=0,1,3', 'E2', 'Packet-loss rates to emulate, in percent.'),
+  _Var('GROUPS=x25519,X25519MLKEM768,MLKEM768', 'E2', 'TLS key-exchange groups to test (default: all of them).'),
+  _Var('MTU=1500', 'E2', 'Packet size limit on the emulated link; 1500 is normal Ethernet.'),
+];
+
+/// One option: name, variable, which experiments use it, input, explanation.
+class _OptionRow extends StatelessWidget {
+  const _OptionRow({
+    required this.name,
+    required this.variable,
+    required this.usedBy,
+    required this.input,
+    required this.help,
+    this.extra,
+  });
+
+  final String name;
+  final String variable;
+  final String usedBy;
+  final Widget input;
+  final String help;
+  final Widget? extra;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final small = theme.textTheme.bodySmall;
+    final title = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(name, style: theme.textTheme.labelLarge),
+      const SizedBox(height: 2),
+      Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text(variable, style: small?.copyWith(fontFamily: 'monospace')),
+        Pill(usedBy, theme.colorScheme.primary),
+      ]),
+    ]);
+    final explanation = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(help, style: small),
+      if (extra != null) Padding(padding: const EdgeInsets.only(top: 6), child: extra),
+    ]);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant))),
+      child: LayoutBuilder(builder: (context, c) {
+        if (c.maxWidth < 760) {
+          // Narrow window: name and input on one line, explanation below.
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Wrap(spacing: 16, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              SizedBox(width: 220, child: title),
+              input,
+            ]),
+            const SizedBox(height: 6),
+            explanation,
+          ]);
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 220, child: title),
+          const SizedBox(width: 12),
+          SizedBox(width: 240, child: Align(alignment: Alignment.centerLeft, child: input)),
+          const SizedBox(width: 16),
+          Expanded(child: explanation),
+        ]);
+      }),
+    );
   }
 }
 
