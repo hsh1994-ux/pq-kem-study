@@ -1,0 +1,4 @@
+# Kept dependency-free (no flutter_lints package needed).
+linter:
+  rules:
+    - avoid_print

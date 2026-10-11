@@ -17,7 +17,7 @@ OSSL_LINK = -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lcrypto
 TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl bin/hs_client \
            $(foreach t,$(TIERS),bin/dudect_kem-$(t)) bin/dudect_planted bin/calibrate
 
-.PHONY: help deps tools sysinfo kat bench tls ct kyber figures report all quick demo clean distclean
+.PHONY: help deps tools sysinfo kat bench tls ct kyber figures report all quick demo gui clean distclean
 
 help:
 	@echo "Targets:"
@@ -30,6 +30,7 @@ help:
 	@echo "  figures    figures/ and report/tables/ from the newest results"
 	@echo "  report     figures + report/main.pdf (needs LaTeX)"
 	@echo "  all        kat bench tls ct figures (the full study, ~1-2 h)"
+	@echo "  gui        open the results viewer (Flutter desktop app in gui/, needs Flutter)"
 	@echo "  quick      the same as smoke tests (~10 min, results not for the report)"
 	@echo "  demo       the mini-conference demo"
 	@echo "  sysinfo    print the machine metadata recorded in every results file"
@@ -108,3 +109,8 @@ clean:
 
 distclean: clean
 	rm -rf $(BUILD_DIR)
+
+# Results viewer: runs natively on the host (not in Docker); needs Flutter.
+GUI_DEVICE = $(if $(filter Darwin,$(shell uname -s)),macos,linux)
+gui:
+	cd gui && { [ -d $(GUI_DEVICE) ] || ./setup.sh; } && flutter run -d $(GUI_DEVICE)

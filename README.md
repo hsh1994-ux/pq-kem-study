@@ -15,7 +15,8 @@ portable and CPU-optimised implementations on **both x86-64 and ARM64**.
 | RQ4 Correctness / interop | E4 KATs, NIST ACVP vectors, cross-checks | `make kat` | `results/raw/e4_*.csv` |
 
 `make figures` turns the newest results into `figures/*.pdf` and `report/tables/*.tex`;
-`make report` builds `report/main.pdf`.
+`make report` builds `report/main.pdf`. To browse the results interactively, use the desktop viewer
+in `gui/` (`make gui`, or see `gui/README.md`).
 
 ## Running it
 
@@ -74,6 +75,7 @@ analysis/             make_figures.py
 report/               LaTeX skeleton of the final report (tables/ is generated)
 docs/logs/            bi-weekly progress reports
 demo/                 mini-conference demo script
+gui/                  results viewer: Flutter desktop app (macOS / Windows / Linux), `make gui`
 docker/               reproducible toolchain image
 results/raw/          one CSV per run, each starting with '# key=value' machine metadata
 ```
