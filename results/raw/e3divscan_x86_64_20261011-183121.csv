@@ -1,0 +1,29 @@
+# date=2026-10-11T16:31:21Z
+# host=hsh
+# arch=x86_64
+# cpu=11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz
+# cores=8
+# kernel=6.18.40.1-microsoft-standard-WSL2
+# virtualisation=wsl in WSL2
+# cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+# liboqs=0.16.0
+# openssl=openssl-3.5.8
+# oqs_provider=0.12.0-rc2
+# repo_commit=e144cb6
+variant,opt_level,function,div_instructions,compiler
+old,O0,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O0,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,Os,poly_tomsg,1,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,Os,poly_compress,1,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O2,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O2,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O3,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O3,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O0,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O0,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,Os,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,Os,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O2,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O2,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O3,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O3,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0

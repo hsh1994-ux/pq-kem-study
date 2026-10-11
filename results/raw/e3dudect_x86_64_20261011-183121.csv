@@ -1,0 +1,40 @@
+# date=2026-10-11T16:31:21Z
+# host=hsh
+# arch=x86_64
+# cpu=11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz
+# cores=8
+# kernel=6.18.40.1-microsoft-standard-WSL2
+# virtualisation=wsl in WSL2
+# cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+# liboqs=0.16.0
+# openssl=openssl-3.5.8
+# oqs_provider=0.12.0-rc2
+# repo_commit=e144cb6
+# dudect_seconds=60.0
+tier,target,op,timer,measurements,max_t,verdict,seconds,tau,opt_level,replicate_max_t
+control,planted-leaky-memcmp,compare,tsc_cycles,14967,160.73,leak,0.2,1.3138,O2,
+control,planted-ct-memcmp,compare,tsc_cycles,848985,10.02,leak,8.5,0.0109,O2,
+ref,ML-KEM-512,decaps,tsc_cycles,1729114,10.16,leak,52.2,0.0077,O3,10.03
+ref,ML-KEM-512,decaps-ff,tsc_cycles,2155388,2.60,no_evidence,60.3,0.0018,O3,
+ref,ML-KEM-768,decaps,tsc_cycles,1309286,9.18,no_evidence,60.4,0.0080,O3,
+ref,ML-KEM-1024,decaps,tsc_cycles,954703,2.86,no_evidence,60.0,0.0029,O3,
+ref,HQC-1,decaps,tsc_cycles,14042,0.92,no_evidence,60.4,0.0078,O3,
+ref,FrodoKEM-640-SHAKE,decaps,tsc_cycles,23222,0.84,no_evidence,60.2,0.0055,O3,
+ref,Classic-McEliece-348864,decaps,tsc_cycles,2581,0.17,insufficient,62.2,0.0033,O3,
+opt,ML-KEM-512,decaps,tsc_cycles,667890,10.14,leak,16.0,0.0124,O3,10.09
+opt,ML-KEM-512,decaps-ff,tsc_cycles,6092546,2.75,no_evidence,60.2,0.0011,O3,
+opt,ML-KEM-768,decaps,tsc_cycles,3470526,10.04,leak,53.7,0.0054,O3,10.04
+opt,ML-KEM-768,decaps-ff,tsc_cycles,3988574,2.37,no_evidence,60.0,0.0012,O3,
+opt,ML-KEM-1024,decaps,tsc_cycles,2695276,4.76,no_evidence,60.1,0.0029,O3,
+opt,HQC-1,decaps,tsc_cycles,18755,0.44,no_evidence,60.3,0.0032,O3,
+opt,FrodoKEM-640-SHAKE,decaps,tsc_cycles,53890,1.12,no_evidence,60.1,0.0048,O3,
+opt,Classic-McEliece-348864,decaps,tsc_cycles,284156,10.00,leak,10.4,0.0188,O3,10.31
+opt,Classic-McEliece-348864,decaps-ff,tsc_cycles,1590265,1.79,no_evidence,60.4,0.0014,O3,
+kyber-ref,Kyber768-old-O0,decaps,tsc_cycles,30454,1.99,no_evidence,60.5,0.0114,O0,
+kyber-ref,Kyber768-old-Os,decaps,tsc_cycles,705426,3.44,no_evidence,60.2,0.0041,Os,
+kyber-ref,Kyber768-old-O2,decaps,tsc_cycles,485676,5.26,no_evidence,60.2,0.0075,O2,
+kyber-ref,Kyber768-old-O3,decaps,tsc_cycles,406712,6.70,no_evidence,60.4,0.0105,O3,
+kyber-ref,Kyber768-fixed-O0,decaps,tsc_cycles,279692,1.78,no_evidence,61.5,0.0034,O0,
+kyber-ref,Kyber768-fixed-Os,decaps,tsc_cycles,788382,2.74,no_evidence,60.3,0.0031,Os,
+kyber-ref,Kyber768-fixed-O2,decaps,tsc_cycles,510378,2.88,no_evidence,60.1,0.0040,O2,
+kyber-ref,Kyber768-fixed-O3,decaps,tsc_cycles,240671,3.00,no_evidence,60.4,0.0061,O3,
