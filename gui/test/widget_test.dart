@@ -5,11 +5,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pq_results/src/data.dart';
+import 'package:pq_results/src/runner.dart';
 import 'package:pq_results/src/pages/compare.dart';
 import 'package:pq_results/src/pages/correctness.dart';
 import 'package:pq_results/src/pages/files.dart';
 import 'package:pq_results/src/pages/overview.dart';
 import 'package:pq_results/src/pages/performance.dart';
+import 'package:pq_results/src/pages/run.dart';
 import 'package:pq_results/src/pages/sizes.dart';
 import 'package:pq_results/src/pages/timing.dart';
 import 'package:pq_results/src/pages/tls.dart';
@@ -24,6 +26,7 @@ void main() {
 
   final pages = <String, Widget Function(ResultsRepo)>{
     'overview': (r) => OverviewPage(repo: r),
+    'run': (r) => RunPage(repo: r, runner: Runner()),
     'performance': (r) => PerformancePage(repo: r),
     'compare': (r) => ComparePage(repo: r),
     'sizes': (r) => SizesPage(repo: r),

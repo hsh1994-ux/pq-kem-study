@@ -10,11 +10,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'src/data.dart';
+import 'src/runner.dart';
 import 'src/pages/compare.dart';
 import 'src/pages/correctness.dart';
 import 'src/pages/files.dart';
 import 'src/pages/overview.dart';
 import 'src/pages/performance.dart';
+import 'src/pages/run.dart';
 import 'src/pages/sizes.dart';
 import 'src/pages/timing.dart';
 import 'src/pages/tls.dart';
@@ -60,6 +62,7 @@ class _Dest {
 
 const _dests = [
   _Dest('Overview', Icons.dashboard_outlined, Icons.dashboard),
+  _Dest('Run', Icons.play_circle_outline, Icons.play_circle),
   _Dest('Performance', Icons.speed_outlined, Icons.speed),
   _Dest('Compare', Icons.compare_arrows_outlined, Icons.compare_arrows),
   _Dest('Sizes', Icons.straighten_outlined, Icons.straighten),
@@ -86,9 +89,15 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<FileSystemEvent>? _watch;
   Timer? _debounce;
 
+  /// Lives here (not in the Run page) so a run keeps going while you browse.
+  final Runner _runner = Runner();
+
   @override
   void initState() {
     super.initState();
+    _runner.onFinished = () {
+      if (mounted) unawaited(_load());
+    };
     // The folder picked last time, else results/raw of the checkout the app runs from.
     final dir = Settings.loadDir() ?? findResultsDir();
     if (dir != null) {
@@ -100,6 +109,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _watch?.cancel();
     _debounce?.cancel();
+    _runner.dispose();
     super.dispose();
   }
 
@@ -201,16 +211,18 @@ class _HomePageState extends State<HomePage> {
       case 0:
         return OverviewPage(repo: repo);
       case 1:
-        return PerformancePage(repo: repo);
+        return RunPage(repo: repo, runner: _runner);
       case 2:
-        return ComparePage(repo: repo);
+        return PerformancePage(repo: repo);
       case 3:
-        return SizesPage(repo: repo);
+        return ComparePage(repo: repo);
       case 4:
-        return TlsPage(repo: repo);
+        return SizesPage(repo: repo);
       case 5:
-        return TimingPage(repo: repo);
+        return TlsPage(repo: repo);
       case 6:
+        return TimingPage(repo: repo);
+      case 7:
         return CorrectnessPage(repo: repo);
       default:
         return FilesPage(repo: repo);
