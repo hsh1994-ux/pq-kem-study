@@ -1,0 +1,46 @@
+# date=2026-10-11T15:34:22Z
+# host=3ab1f31e3c4c
+# arch=aarch64
+# cpu=Apple M4
+# cores=10
+# kernel=7.0.14-linuxkit
+# virtualisation=container in Docker Desktop VM (linuxkit)
+# cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+# liboqs=0.16.0
+# openssl=openssl-3.5.8
+# oqs_provider=0.12.0-rc2
+# repo_commit=124a4d6
+# dudect_seconds=60.0
+tier,target,op,timer,measurements,max_t,verdict,seconds,tau,opt_level,replicate_max_t
+control,planted-leaky-memcmp,compare,cntvct_ticks,14967,478.96,leak,0.1,3.9150,O2,
+control,planted-ct-memcmp,compare,cntvct_ticks,1502142,10.08,leak,19.6,0.0082,O2,
+ref,ML-KEM-512,decaps,cntvct_ticks,1910943,10.59,leak,22.4,0.0077,O3,10.18
+ref,ML-KEM-512,decaps-ff,cntvct_ticks,5217129,1.08,no_evidence,60.1,0.0005,O3,
+ref,ML-KEM-768,decaps,cntvct_ticks,1346792,10.10,leak,24.0,0.0087,O3,10.06
+ref,ML-KEM-768,decaps-ff,cntvct_ticks,1174774,2.34,no_evidence,60.2,0.0022,O3,
+ref,ML-KEM-1024,decaps,cntvct_ticks,2357243,5.11,no_evidence,60.4,0.0033,O3,
+ref,HQC-1,decaps,cntvct_ticks,22190,2.48,no_evidence,60.3,0.0166,O3,
+ref,FrodoKEM-640-SHAKE,decaps,cntvct_ticks,24952,2.46,no_evidence,60.4,0.0156,O3,
+ref,Classic-McEliece-348864,decaps,cntvct_ticks,3649,0.34,insufficient,60.6,0.0056,O3,
+opt,ML-KEM-512,decaps,cntvct_ticks,574483,10.60,leak,4.9,0.0140,O3,10.22
+opt,ML-KEM-512,decaps-ff,cntvct_ticks,7333314,1.92,no_evidence,60.2,0.0007,O3,
+opt,ML-KEM-768,decaps,cntvct_ticks,864335,10.09,leak,11.2,0.0109,O3,10.13
+opt,ML-KEM-768,decaps-ff,cntvct_ticks,4745581,1.52,no_evidence,60.2,0.0007,O3,
+opt,ML-KEM-1024,decaps,cntvct_ticks,3182079,8.55,no_evidence,60.1,0.0048,O3,
+opt,HQC-1,decaps,cntvct_ticks,28486,1.61,no_evidence,60.4,0.0095,O3,
+opt,FrodoKEM-640-SHAKE,decaps,cntvct_ticks,49815,1.66,no_evidence,60.2,0.0074,O3,
+opt,Classic-McEliece-348864,decaps,cntvct_ticks,3649,1.32,insufficient,61.2,0.0219,O3,
+kyber-ref,Kyber768-old-O0,decaps,cntvct_ticks,67456,1.80,no_evidence,61.3,0.0069,O0,
+kyber-ref,Kyber768-old-Os,decaps,cntvct_ticks,319234,10.16,leak,15.5,0.0180,Os,10.07
+kyber-ref,Kyber768-old-Os,decaps-ff,cntvct_ticks,1164188,1.76,no_evidence,60.4,0.0016,Os,
+kyber-ref,Kyber768-old-O2,decaps,cntvct_ticks,603529,10.06,leak,26.1,0.0129,O2,10.83
+kyber-ref,Kyber768-old-O2,decaps-ff,cntvct_ticks,237581,2.40,no_evidence,60.3,0.0049,O2,
+kyber-ref,Kyber768-old-O3,decaps,cntvct_ticks,330372,10.13,leak,12.9,0.0176,O3,10.66
+kyber-ref,Kyber768-old-O3,decaps-ff,cntvct_ticks,347835,2.33,no_evidence,60.2,0.0040,O3,
+kyber-ref,Kyber768-fixed-O0,decaps,cntvct_ticks,348429,2.93,no_evidence,61.2,0.0050,O0,
+kyber-ref,Kyber768-fixed-Os,decaps,cntvct_ticks,383773,10.24,leak,18.1,0.0165,Os,10.02
+kyber-ref,Kyber768-fixed-Os,decaps-ff,cntvct_ticks,1294347,2.11,no_evidence,60.2,0.0019,Os,
+kyber-ref,Kyber768-fixed-O2,decaps,cntvct_ticks,291377,10.24,leak,12.4,0.0190,O2,10.09
+kyber-ref,Kyber768-fixed-O2,decaps-ff,cntvct_ticks,1488361,1.89,no_evidence,60.3,0.0015,O2,
+kyber-ref,Kyber768-fixed-O3,decaps,cntvct_ticks,199221,10.06,leak,7.5,0.0225,O3,10.13
+kyber-ref,Kyber768-fixed-O3,decaps-ff,cntvct_ticks,1689621,1.34,no_evidence,60.1,0.0010,O3,

@@ -1,0 +1,29 @@
+# date=2026-10-11T15:34:22Z
+# host=3ab1f31e3c4c
+# arch=aarch64
+# cpu=Apple M4
+# cores=10
+# kernel=7.0.14-linuxkit
+# virtualisation=container in Docker Desktop VM (linuxkit)
+# cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+# liboqs=0.16.0
+# openssl=openssl-3.5.8
+# oqs_provider=0.12.0-rc2
+# repo_commit=124a4d6
+variant,opt_level,function,div_instructions,compiler
+old,O0,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O0,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,Os,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,Os,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O2,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O2,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O3,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+old,O3,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O0,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O0,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,Os,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,Os,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O2,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O2,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O3,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+fixed,O3,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
