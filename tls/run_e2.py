@@ -3,7 +3,9 @@
 
 The whole experiment runs inside a private network namespace, so it never
 touches the host's network: `unshare -rn` (no root needed) or `unshare -n`
-when already root (e.g. in Docker with --cap-add=NET_ADMIN).
+when already root. Docker forbids unshare by default, but a container (on
+its default network) already has a private namespace, so E2 uses that; it
+needs --cap-add=NET_ADMIN to change lo's MTU and add tc netem.
 
 Inside the namespace:
   * loopback MTU is set to 1500 (Ethernet), so large key shares are split
@@ -13,7 +15,7 @@ Inside the namespace:
   * one `openssl s_server` offers all groups; bin/hs_client offers exactly
     one group per run, so that group is what gets negotiated
 
-Environment knobs: QUICK=1, N_HS (handshakes per cell), GROUPS (comma list),
+Environment knobs: QUICK=1, N_HS (handshakes per cell), E2_GROUPS (comma list),
 RTTS (ms, comma list), LOSSES (%, comma list), MTU (default 1500).
 Writes results/raw/e2_<arch>_<time>.csv.
 """
@@ -56,9 +58,28 @@ def sh(*cmd, check=True):
     return r
 
 
+def in_private_container_netns() -> bool:
+    """True inside a container that has its own network namespace (Docker's
+    default bridge network), where changing lo cannot affect the host."""
+    in_container = os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+    host_net = any(os.path.exists(f"/sys/class/net/{i}") for i in ("docker0", "cni0", "br-lan"))
+    return in_container and not host_net
+
+
 def reexec_in_netns():
     cmd = ["unshare", "-n"] if os.geteuid() == 0 else ["unshare", "-rn"]
     env = dict(os.environ, E2_IN_NS="1")
+    # Docker's default seccomp profile refuses unshare without CAP_SYS_ADMIN, but a
+    # container already has a private network namespace: use that one instead.
+    probe = subprocess.run(cmd + ["true"], capture_output=True, text=True)
+    if probe.returncode != 0:
+        if in_private_container_netns():
+            print("  (unshare not permitted in this container; using the container's own "
+                  "private network namespace)")
+            os.environ["E2_IN_NS"] = "1"
+            return
+        raise SystemExit(f"cannot create a network namespace ({probe.stderr.strip()}); run on Linux "
+                         "with unprivileged user namespaces, or in Docker with --cap-add=NET_ADMIN")
     try:
         os.execvpe(cmd[0], cmd + [sys.executable, __file__] + sys.argv[1:], env)
     except OSError as e:
@@ -104,7 +125,8 @@ def main():
     rtts = [float(x) for x in csv_list("RTTS", ["0", "50"] if quick else ["0", "50", "200"])]
     losses = [float(x) for x in csv_list("LOSSES", ["0", "1"] if quick else ["0", "1", "3"])]
     mtu = int(os.environ.get("MTU", 1500))
-    groups = csv_list("GROUPS", DEFAULT_GROUPS)
+    # E2_GROUPS, not GROUPS: bash has a read-only GROUPS variable, so GROUPS=... never arrives.
+    groups = csv_list("E2_GROUPS", DEFAULT_GROUPS)
 
     sh("ip", "link", "set", "lo", "up")
     sh("ip", "link", "set", "lo", "mtu", mtu)

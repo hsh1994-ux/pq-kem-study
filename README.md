@@ -57,7 +57,7 @@ x86-64 Linux, so both architectures run identical code.
 | `KEMS=ML-KEM-768,HQC-1` | E1, E4 | subset of `kems.conf` |
 | `N_OPS`, `N_MCE_KEYGEN`, `COOLDOWN`, `PIN_CPU` | E1 | iterations, McEliece keygens, pause between KEMs (s), core to pin |
 | `WARMUP_MS` | E1 | busy-wait before the first timed operation (default 200) |
-| `N_HS`, `GROUPS`, `RTTS`, `LOSSES`, `MTU` | E2 | handshakes per cell, TLS groups, RTTs (ms), loss (%), MTU |
+| `N_HS`, `E2_GROUPS`, `RTTS`, `LOSSES`, `MTU` | E2 | handshakes per cell, TLS groups, RTTs (ms), loss (%), MTU |
 | `DUDECT_SECONDS`, `E3_KEMS` | E3 | time budget per dudect target, KEMs to test |
 
 ## Layout

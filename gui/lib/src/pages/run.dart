@@ -418,7 +418,7 @@ const _moreVars = [
   _Var('N_HS=200', 'E2', 'TLS handshakes per group and network setting (10 in quick mode).'),
   _Var('RTTS=0,50,200', 'E2', 'Round-trip delays to emulate, in ms (tc netem).'),
   _Var('LOSSES=0,1,3', 'E2', 'Packet-loss rates to emulate, in percent.'),
-  _Var('GROUPS=x25519,X25519MLKEM768,MLKEM768', 'E2', 'TLS key-exchange groups to test (default: all of them).'),
+  _Var('E2_GROUPS=x25519,X25519MLKEM768,MLKEM768', 'E2', 'TLS key-exchange groups to test (default: all of them).'),
   _Var('MTU=1500', 'E2', 'Packet size limit on the emulated link; 1500 is normal Ethernet.'),
 ];
 
