@@ -44,7 +44,8 @@ docker run --rm -it --cap-add=NET_ADMIN -v "$PWD":/work pq-kem-study make quick
 docker run --rm -it --cap-add=NET_ADMIN -v "$PWD":/work pq-kem-study make all
 ```
 
-`--cap-add=NET_ADMIN` is only needed by E2 (network emulation). The same image builds natively on
+`--cap-add=NET_ADMIN` is only needed by E2 (network emulation). Inside Docker on a Mac, Linux cannot
+see the chip's name, so pass it for the results metadata: `-e CPU_MODEL="Apple M4"`. The same image builds natively on
 x86-64 Linux, so both architectures run identical code.
 
 ### Useful knobs
