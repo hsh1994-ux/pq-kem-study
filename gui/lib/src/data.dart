@@ -100,8 +100,9 @@ class ResultFile {
   String get host => meta['host'] ?? '';
   String get virt => meta['virtualisation'] ?? '';
 
-  /// Files from the same machine share this key.
-  String get machineKey => '$cpu|$arch|$host';
+  /// Files from the same machine share this key. Not the host name: Docker
+  /// gives every container a random one.
+  String get machineKey => '$cpu|$arch';
   String get machineLabel => '${shortCpu(cpu)} ($arch)';
 
   String get timeLabel {
