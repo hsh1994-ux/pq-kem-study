@@ -12,6 +12,13 @@ Environment knobs:
   COOLDOWN=0    seconds to sleep between KEMs; use ~30 on a fanless laptop
   PIN_CPU=1     core to pin to with taskset (empty to disable)
   WARMUP_MS=200 busy-wait before the first timed operation of each process
+  KEMS=none     skip the liboqs KEMs (KEMS=a,b limits them to a subset)
+  E1_OSSL=a,b   only these OpenSSL algorithms (default: all of OSSL_ALGS)
+  E1_APPEND=f   add the new rows to an existing results file f instead of
+                writing a new one (rows with the same tier/alg/op are
+                replaced); a '# appended_N=...' header line records when, with
+                which commit, and the timer calibration of the added rows.
+                f must come from the same machine.
 
 Timer calibration: bin/calibrate runs once at the start; its ns_per_tick is
 passed to every benchmark process (PQ_NS_PER_TICK) and recorded in the
@@ -80,6 +87,38 @@ def run_bench(cmd: list[str], env: dict) -> list[dict]:
     return list(csv.DictReader(io.StringIO(r.stdout), fieldnames=FIELDS))
 
 
+def append_rows(path: Path, rows: list[dict], note: dict) -> None:
+    """Merge rows into an existing E1 file, keeping its header and recording the addition."""
+    if not path.is_absolute():
+        path = pqlib.ROOT / path
+    if not path.exists():
+        raise SystemExit(f"E1_APPEND: {path} not found")
+    lines = path.read_text().splitlines()
+    meta = [l for l in lines if l.startswith("#")]
+    old = list(csv.DictReader(l for l in lines if not l.startswith("#")))
+    arch = next((l.split("=", 1)[1] for l in meta if l.startswith("# arch=")), "")
+    if arch and arch != pqlib.arch():
+        raise SystemExit(f"E1_APPEND: {path.name} is from {arch}, this machine is {pqlib.arch()}")
+    renamed = False
+    for r in old:  # files from before the plain-ECDH baseline call the DHKEM row "X25519"
+        if r["tier"] == "openssl" and r["alg"] == "X25519":
+            r["alg"], renamed = "X25519-DHKEM", True
+    if renamed:
+        note = note | {"renamed": "X25519 -> X25519-DHKEM"}
+    key = lambda r: (r["tier"], r["alg"], r["op"])
+    new_keys = {key(r) for r in rows}
+    merged = [r for r in old if key(r) not in new_keys] + rows
+    n = sum(1 for l in meta if l.startswith("# appended_")) + 1
+    meta.append(f"# appended_{n}=" + "; ".join(f"{k} {v}" for k, v in note.items()))
+    fields = list(old[0].keys()) if old else FIELDS
+    with open(path, "w", newline="") as f:
+        f.write("\n".join(meta) + "\n")
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(merged)
+    print(f"added {len(rows)} rows to {path.relative_to(pqlib.ROOT)} ({len(merged)} rows now)")
+
+
 def main():
     quick = pqlib.QUICK
     n_ops = env_int("N_OPS", 50 if quick else 1000)
@@ -92,8 +131,10 @@ def main():
           f"core clock now ~{cal['core_ghz']} GHz")
     env = pqlib.openssl_env() | {"PQ_NS_PER_TICK": cal["ns_per_tick"]}
 
-    for tier in pqlib.TIERS:
-        for alg in pqlib.kems():
+    kems = [] if os.environ.get("KEMS", "").strip().lower() == "none" else pqlib.kems()
+    ossl_algs = [a.strip() for a in os.environ.get("E1_OSSL", "").split(",") if a.strip()] or OSSL_ALGS
+    for tier in pqlib.TIERS if kems else []:
+        for alg in kems:
             nk = n_mce if "McEliece" in alg else n_ops
             t0 = time.time()
             got = run_bench([str(pqlib.BIN / f"bench_kem-{tier}"), alg, str(nk), str(n_ops)], env)
@@ -104,7 +145,7 @@ def main():
             print(f"       ({time.time() - t0:.0f}s)")
             time.sleep(cooldown)
 
-    for alg in OSSL_ALGS:
+    for alg in ossl_algs:
         got = run_bench([str(pqlib.BIN / "bench_ossl"), alg, str(n_ops), str(n_ops)], env)
         rows += got
         for r in got:
@@ -116,7 +157,17 @@ def main():
                            "warmup_ms": os.environ.get("WARMUP_MS", "200"),
                            "ns_per_tick": cal["ns_per_tick"], "tick_mhz": cal["tick_mhz"],
                            "core_ghz_at_start": cal["core_ghz"]}
-    pqlib.write_csv(pqlib.results_path("e1"), rows, extra)
+    target = os.environ.get("E1_APPEND", "").strip()
+    if target:
+        commit = subprocess.run(["git", "-C", str(pqlib.ROOT), "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True).stdout.strip() or "none"
+        algs = sorted({r["alg"] for r in rows})
+        append_rows(Path(target), rows, {"date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                         "algs": ",".join(algs), "repo_commit": commit,
+                                         "n_ops": n_ops, "ns_per_tick": cal["ns_per_tick"],
+                                         "core_ghz_at_start": cal["core_ghz"]})
+    else:
+        pqlib.write_csv(pqlib.results_path("e1"), rows, extra)
 
 
 if __name__ == "__main__":
