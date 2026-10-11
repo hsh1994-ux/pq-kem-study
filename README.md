@@ -100,6 +100,11 @@ results/raw/          one CSV per run, each starting with '# key=value' machine 
   ~1.6 ms, which made M4 keygen (measured first) look slower than encaps.
 - **Results viewer.** `gui/` is a Flutter desktop app that shows everything in `results/raw`; see
   `gui/README.md`.
+- **Classical baseline (E1).** `X25519-ECDH` is plain ephemeral X25519 as TLS 1.3 uses it, timed in
+  KEM roles: keygen = client key pair, encaps = server key pair + shared secret, decaps = client
+  shared secret, so keygen + encaps + decaps is one full ECDHE exchange. `X25519-DHKEM` is the same
+  curve wrapped as a KEM (RFC 9180), which adds an HKDF step (~5%). Runs before 2026-10-11 evening
+  call the DHKEM row just `X25519`.
 - **E2** runs in its own network namespace (`unshare -rn`, no root needed), with loopback MTU set
   to 1500. Classic McEliece has no TLS group: its 261 KB public key cannot fit in a ClientHello key
   share (maximum 65,535 bytes). This is recorded as a result.

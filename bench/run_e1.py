@@ -2,7 +2,7 @@
 """E1 -- microbenchmarks (RQ1).
 
 Runs bin/bench_kem-{ref,opt} for every KEM in kems.conf, plus
-bin/bench_ossl for OpenSSL's own ML-KEM, X25519 and X25519MLKEM768,
+bin/bench_ossl for OpenSSL's own ML-KEM, X25519 (plain ECDH and DHKEM) and X25519MLKEM768,
 and writes results/raw/e1_<arch>_<time>.csv.
 
 Environment knobs:
@@ -34,7 +34,8 @@ import pqlib  # noqa: E402
 FIELDS = ["tier", "alg", "op", "n", "unit", "ns_per_tick", "min", "p25", "median", "p75",
           "mean", "median_ns", "p25_ns", "p75_ns", "stack_bytes", "pk_bytes", "sk_bytes",
           "ct_bytes", "ss_bytes", "ghz_before", "ghz_after", "median_core_cycles_est"]
-OSSL_ALGS = ["X25519", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024", "X25519MLKEM768"]
+# X25519-ECDH: plain ephemeral ECDH as in TLS 1.3; X25519-DHKEM: the same wrapped as a KEM (RFC 9180).
+OSSL_ALGS = ["X25519-ECDH", "X25519-DHKEM", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024", "X25519MLKEM768"]
 
 
 def env_int(name, default):

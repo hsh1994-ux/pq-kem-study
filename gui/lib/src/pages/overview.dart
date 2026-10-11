@@ -8,6 +8,7 @@ import '../widgets.dart';
 import 'files.dart' show experimentNames;
 
 const _headline = [
+  ('X25519-ECDH', 'openssl'),
   ('X25519', 'openssl'),
   ('X25519MLKEM768', 'openssl'),
   ('ML-KEM-768', 'opt'),

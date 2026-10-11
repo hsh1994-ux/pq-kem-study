@@ -4,9 +4,17 @@
  *   bench_ossl ALG N_KEYGEN N_OPS      ALG: X25519 | ML-KEM-512/768/1024 |
  *                                           X25519MLKEM768 | ...
  *
- * Uses the generic EVP KEM API, so X25519 runs as DHKEM (RFC 9180): encaps =
- * ephemeral keygen + ECDH, the fair comparison to a KEM. Output format is
- * identical to bench_kem, with tier "openssl".
+ * Uses the generic EVP KEM API. X25519-DHKEM is X25519 wrapped as a KEM (DHKEM,
+ * RFC 9180): encaps = ephemeral keygen + ECDH + HKDF. Output format is identical to bench_kem,
+ * with tier "openssl".
+ *
+ * X25519-ECDH is plain ephemeral X25519 key agreement as TLS 1.3 uses it (no
+ * KEM wrapper, no HKDF), reported in KEM roles so it lines up with the KEMs:
+ *   keygen = client generates its key pair
+ *   encaps = server generates its key pair and derives the shared secret
+ *            from the client's public key (bytes -> key, then ECDH)
+ *   decaps = client derives the shared secret from the server's public key
+ * keygen + encaps + decaps = one full ECDHE exchange.
  */
 #include <openssl/core_names.h>
 #include <openssl/err.h>
@@ -64,6 +72,73 @@ static void report(const char *alg, const char *op, uint64_t *t, int n, double n
     fflush(stdout);
 }
 
+/* ECDH with a peer public key received as bytes, as in a TLS key share. */
+static void derive(EVP_PKEY *mine, const uint8_t *peer_pub, size_t peer_len, uint8_t *out, size_t *out_len) {
+    EVP_PKEY *peer = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, peer_pub, peer_len);
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_pkey(NULL, mine, NULL);
+    if (!peer || !c || EVP_PKEY_derive_init(c) <= 0 || EVP_PKEY_derive_set_peer(c, peer) <= 0 ||
+        EVP_PKEY_derive(c, out, out_len) <= 0)
+        ossl_die("derive");
+    EVP_PKEY_CTX_free(c);
+    EVP_PKEY_free(peer);
+}
+
+static void raw_pub(EVP_PKEY *k, uint8_t *pub, size_t *len) {
+    if (EVP_PKEY_get_raw_public_key(k, pub, len) <= 0) ossl_die("get_raw_public_key");
+}
+
+static int bench_ecdh(const char *label, int nk, int no, double npt, uint64_t *t) {
+    double g0, g1;
+    uint8_t cpub[32], spub[32], ss1[32], ss2[32];
+    size_t cl = 32, sl = 32, l1 = 32, l2 = 32;
+
+    g0 = pq_core_ghz();
+    for (int i = 0; i < nk; i++) {
+        uint64_t t0 = cpucycles();
+        EVP_PKEY *k = keygen("X25519");
+        size_t len = 32;
+        raw_pub(k, cpub, &len); /* the client's key share */
+        t[i] = cpucycles() - t0;
+        EVP_PKEY_free(k);
+    }
+    g1 = pq_core_ghz();
+    report(label, "keygen", t, nk, npt, 32, 32, 32, g0, g1);
+
+    EVP_PKEY *client = keygen("X25519");
+    raw_pub(client, cpub, &cl);
+
+    EVP_PKEY *server = NULL;
+    g0 = pq_core_ghz();
+    for (int i = 0; i < no; i++) {
+        uint64_t t0 = cpucycles();
+        EVP_PKEY *s = keygen("X25519");
+        sl = 32;
+        raw_pub(s, spub, &sl);
+        l1 = 32;
+        derive(s, cpub, cl, ss1, &l1);
+        t[i] = cpucycles() - t0;
+        EVP_PKEY_free(server);
+        server = s;
+    }
+    g1 = pq_core_ghz();
+    report(label, "encaps", t, no, npt, 32, 32, 32, g0, g1);
+
+    g0 = pq_core_ghz();
+    for (int i = 0; i < no; i++) {
+        uint64_t t0 = cpucycles();
+        l2 = 32;
+        derive(client, spub, sl, ss2, &l2);
+        t[i] = cpucycles() - t0;
+    }
+    g1 = pq_core_ghz();
+    if (l1 != l2 || memcmp(ss1, ss2, l1)) die("%s: shared secrets differ", label);
+    report(label, "decaps", t, no, npt, 32, 32, 32, g0, g1);
+
+    EVP_PKEY_free(server);
+    EVP_PKEY_free(client);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc != 4) die("usage: bench_ossl ALG N_KEYGEN N_OPS");
     const char *alg = argv[1];
@@ -74,21 +149,24 @@ int main(int argc, char **argv) {
     double g0, g1;
     int nmax = nk > no ? nk : no;
     uint64_t *t = xmalloc(sizeof(uint64_t) * (size_t)nmax);
+    if (!strcmp(alg, "X25519-ECDH")) return bench_ecdh(alg, nk, no, npt, t);
+    /* "X25519-DHKEM" is reported under that name but is OpenSSL's X25519 key type. */
+    const char *evp = !strcmp(alg, "X25519-DHKEM") ? "X25519" : alg;
 
     /* keygen */
     g0 = pq_core_ghz();
     for (int i = 0; i < nk; i++) {
         uint64_t t0 = cpucycles();
-        EVP_PKEY *k = keygen(alg);
+        EVP_PKEY *k = keygen(evp);
         t[i] = cpucycles() - t0;
         EVP_PKEY_free(k);
     }
     g1 = pq_core_ghz();
-    EVP_PKEY *key = keygen(alg);
+    EVP_PKEY *key = keygen(evp);
     size_t pk_len = 0, ct_len = 0, ss_len = 0;
     if (!EVP_PKEY_get_octet_string_param(key, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0, &pk_len))
         pk_len = 0;
-    EVP_PKEY_CTX *ec = kem_ctx(key, alg, 1);
+    EVP_PKEY_CTX *ec = kem_ctx(key, evp, 1);
     if (EVP_PKEY_encapsulate(ec, NULL, &ct_len, NULL, &ss_len) <= 0) ossl_die("encapsulate(size)");
     report(alg, "keygen", t, nk, npt, pk_len, ct_len, ss_len, g0, g1);
 
@@ -105,7 +183,7 @@ int main(int argc, char **argv) {
     report(alg, "encaps", t, no, npt, pk_len, ct_len, ss_len, g0, g1);
 
     /* decaps */
-    EVP_PKEY_CTX *dc = kem_ctx(key, alg, 0);
+    EVP_PKEY_CTX *dc = kem_ctx(key, evp, 0);
     g0 = pq_core_ghz();
     for (int i = 0; i < no; i++) {
         size_t sl = ss_len;

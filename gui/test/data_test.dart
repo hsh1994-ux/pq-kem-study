@@ -60,6 +60,8 @@ void main() {
     final cat = KemCatalog.parse('# NIST level 1\nML-KEM-512\nHQC-1\n# NIST level 3\nML-KEM-768\n');
     expect(cat.sort(['ML-KEM-768', 'X25519', 'HQC-1', 'Zzz', 'ML-KEM-512']),
         ['X25519', 'ML-KEM-512', 'HQC-1', 'ML-KEM-768', 'Zzz']);
+    expect(cat.sort(['X25519MLKEM768', 'X25519-DHKEM', 'X25519-ECDH']), ['X25519-ECDH', 'X25519-DHKEM', 'X25519MLKEM768']);
+    expect(cat.levelOf('X25519-ECDH'), 0);
     expect(cat.levelOf('ML-KEM-768'), 3);
     expect(cat.levelOf('X25519MLKEM768'), 0);
     expect(cat.levelOf('ML-KEM-1024'), 5);

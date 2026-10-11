@@ -168,7 +168,8 @@ class KemCatalog {
   final List<String> order;
   final Map<String, int> level;
 
-  static const baselines = ['X25519', 'X25519MLKEM768'];
+  // X25519 = X25519-DHKEM in runs made before the plain-ECDH baseline was added.
+  static const baselines = ['X25519-ECDH', 'X25519-DHKEM', 'X25519', 'X25519MLKEM768'];
 
   static final fallback = KemCatalog([
     'ML-KEM-512', 'HQC-1', 'FrodoKEM-640-SHAKE', 'Classic-McEliece-348864', //
