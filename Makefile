@@ -15,7 +15,7 @@ TIERS    = ref opt
 OSSL     = $(BUILD_DIR)/openssl
 OSSL_LINK = -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lcrypto
 TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl bin/hs_client \
-           $(foreach t,$(TIERS),bin/dudect_kem-$(t)) bin/dudect_planted
+           $(foreach t,$(TIERS),bin/dudect_kem-$(t)) bin/dudect_planted bin/calibrate
 
 .PHONY: help deps tools sysinfo kat bench tls ct kyber figures report all quick demo clean distclean
 
@@ -49,6 +49,10 @@ bin/kemtool-%: kat/kemtool.c $(HDRS)
 bin/bench_kem-%: bench/bench_kem.c $(HDRS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) -DBUILD_TIER='"$*"' -I$(OQS)/include $< -o $@ $(OQS_LINK)
+
+bin/calibrate: bench/calibrate.c $(HDRS)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) $< -o $@
 
 bin/bench_ossl: bench/bench_ossl.c $(HDRS)
 	@mkdir -p bin

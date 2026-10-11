@@ -7,7 +7,13 @@
  * and prints one CSV row per operation (no header) to stdout:
  *
  *   tier,alg,op,n,unit,ns_per_tick,min,p25,median,p75,mean,
- *   median_ns,p25_ns,p75_ns,stack_bytes,pk_bytes,sk_bytes,ct_bytes,ss_bytes
+ *   median_ns,p25_ns,p75_ns,stack_bytes,pk_bytes,sk_bytes,ct_bytes,ss_bytes,
+ *   ghz_before,ghz_after,median_core_cycles_est
+ *
+ * ghz_before/after: core clock estimated (pq_core_ghz) just before and after
+ * the timed loop; median_core_cycles_est = median_ns x their mean.
+ * Before the first operation the core is warmed up for WARMUP_MS (default
+ * 200 ms) so that it is at full clock, not ramping up from idle.
  *
  * Stack use is measured by running each operation once on a thread whose
  * stack we allocate and pre-fill with a pattern, then finding the deepest
@@ -82,11 +88,13 @@ static void bench(struct ctx *c, enum op op, int n, double ns_per_tick, size_t b
     uint64_t *t = xmalloc(sizeof(uint64_t) * (size_t)n);
     c->op = op;
     for (int i = 0; i < (n < 10 ? 1 : n / 10); i++) run_op(c); /* warm-up */
+    double ghz0 = pq_core_ghz();
     for (int i = 0; i < n; i++) {
         uint64_t t0 = cpucycles();
         run_op(c);
         t[i] = cpucycles() - t0;
     }
+    double ghz1 = pq_core_ghz();
     qsort(t, (size_t)n, sizeof(uint64_t), cmp_u64);
     double mean = 0;
     for (int i = 0; i < n; i++) mean += (double)t[i];
@@ -94,13 +102,15 @@ static void bench(struct ctx *c, enum op op, int n, double ns_per_tick, size_t b
     size_t st = stack_used(c);
     st = st > base_stack ? st - base_stack : 0;
     OQS_KEM *k = c->k;
-    printf("%s,%s,%s,%d,%s,%.6f,%llu,%llu,%llu,%llu,%.1f,%.1f,%.1f,%.1f,%zu,%zu,%zu,%zu,%zu\n",
+    double med_ns = pct(t, n, .5) * ns_per_tick;
+    printf("%s,%s,%s,%d,%s,%.6f,%llu,%llu,%llu,%llu,%.1f,%.1f,%.1f,%.1f,%zu,%zu,%zu,%zu,%zu,"
+           "%.3f,%.3f,%.0f\n",
            BUILD_TIER, k->method_name, op_name[op], n, cpucycles_unit(), ns_per_tick,
            (unsigned long long)t[0], (unsigned long long)pct(t, n, .25),
            (unsigned long long)pct(t, n, .5), (unsigned long long)pct(t, n, .75), mean,
-           pct(t, n, .5) * ns_per_tick, pct(t, n, .25) * ns_per_tick, pct(t, n, .75) * ns_per_tick,
+           med_ns, pct(t, n, .25) * ns_per_tick, pct(t, n, .75) * ns_per_tick,
            st, k->length_public_key, k->length_secret_key, k->length_ciphertext,
-           k->length_shared_secret);
+           k->length_shared_secret, ghz0, ghz1, med_ns * (ghz0 + ghz1) / 2);
     fflush(stdout);
     free(t);
 }
@@ -119,6 +129,8 @@ int main(int argc, char **argv) {
     c.ss = xmalloc(c.k->length_shared_secret);
 
     double ns_per_tick = cpucycles_ns_per_tick();
+    const char *wm = getenv("WARMUP_MS");
+    pq_spin_ms(wm ? (unsigned)atoi(wm) : 200);
     c.op = OP_NONE;
     size_t base = stack_used(&c);
 

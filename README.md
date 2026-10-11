@@ -55,6 +55,7 @@ x86-64 Linux, so both architectures run identical code.
 | `QUICK=1` | all | few iterations, smoke test only |
 | `KEMS=ML-KEM-768,HQC-1` | E1, E4 | subset of `kems.conf` |
 | `N_OPS`, `N_MCE_KEYGEN`, `COOLDOWN`, `PIN_CPU` | E1 | iterations, McEliece keygens, pause between KEMs (s), core to pin |
+| `WARMUP_MS` | E1 | busy-wait before the first timed operation (default 200) |
 | `N_HS`, `GROUPS`, `RTTS`, `LOSSES`, `MTU` | E2 | handshakes per cell, TLS groups, RTTs (ms), loss (%), MTU |
 | `DUDECT_SECONDS`, `E3_KEMS` | E3 | time budget per dudect target, KEMs to test |
 
@@ -85,6 +86,18 @@ results/raw/          one CSV per run, each starting with '# key=value' machine 
 - **Timing** on ARM64 uses the architectural counter (24 MHz on Apple silicon, ~41.7 ns per tick),
   because the cycle counter is not readable from user space or inside VMs. Results are converted to
   nanoseconds so both architectures share an axis.
+- **Calibration (E1).** `bin/calibrate` runs once per run: on x86-64 it measures the TSC rate
+  (median of 5 x 200 ms against the OS clock; one 50 ms window varied by +-4% under WSL2), and every
+  benchmark process reuses that value (`PQ_NS_PER_TICK`). Each row also records the core clock just
+  before and after its timed loop (`ghz_before`, `ghz_after`), estimated by timing a chain of
+  dependent additions (1 cycle each), and `median_core_cycles_est` = median ns x that clock, for
+  comparison with published cycle counts. This works inside WSL2 and Docker, where the real cycle
+  counter is not readable. It read 4.39 GHz on the M4 (P-core maximum ~4.4 GHz).
+- **Warm-up (E1).** After 5 s idle the M4 starts at ~2 GHz and needs ~90 ms to approach full clock,
+  so each benchmark process first spins for `WARMUP_MS` (200 ms). Before this fix the warm-up was
+  ~1.6 ms, which made M4 keygen (measured first) look slower than encaps.
+- **Results viewer.** `gui/` is a Flutter desktop app that shows everything in `results/raw`; see
+  `gui/README.md`.
 - **E2** runs in its own network namespace (`unshare -rn`, no root needed), with loopback MTU set
   to 1500. Classic McEliece has no TLS group: its 261 KB public key cannot fit in a ClientHello key
   share (maximum 65,535 bytes). This is recorded as a result.

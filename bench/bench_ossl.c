@@ -47,17 +47,20 @@ static int cmp_u64(const void *a, const void *b) {
 static uint64_t pct(const uint64_t *s, int n, double p) { return s[(int)(p * (n - 1) + 0.5)]; }
 
 static void report(const char *alg, const char *op, uint64_t *t, int n, double npt,
-                   size_t pk, size_t ct, size_t ss) {
+                   size_t pk, size_t ct, size_t ss, double ghz0, double ghz1) {
     qsort(t, (size_t)n, sizeof(uint64_t), cmp_u64);
     double mean = 0;
     for (int i = 0; i < n; i++) mean += (double)t[i];
     mean /= n;
     /* stack_bytes / sk_bytes not measured for OpenSSL (-1) */
-    printf("openssl,%s,%s,%d,%s,%.6f,%llu,%llu,%llu,%llu,%.1f,%.1f,%.1f,%.1f,-1,%zu,-1,%zu,%zu\n",
+    double med_ns = pct(t, n, .5) * npt;
+    printf("openssl,%s,%s,%d,%s,%.6f,%llu,%llu,%llu,%llu,%.1f,%.1f,%.1f,%.1f,-1,%zu,-1,%zu,%zu,"
+           "%.3f,%.3f,%.0f\n",
            alg, op, n, cpucycles_unit(), npt, (unsigned long long)t[0],
            (unsigned long long)pct(t, n, .25), (unsigned long long)pct(t, n, .5),
-           (unsigned long long)pct(t, n, .75), mean, pct(t, n, .5) * npt,
-           pct(t, n, .25) * npt, pct(t, n, .75) * npt, pk, ct, ss);
+           (unsigned long long)pct(t, n, .75), mean, med_ns,
+           pct(t, n, .25) * npt, pct(t, n, .75) * npt, pk, ct, ss, ghz0, ghz1,
+           med_ns * (ghz0 + ghz1) / 2);
     fflush(stdout);
 }
 
@@ -66,44 +69,53 @@ int main(int argc, char **argv) {
     const char *alg = argv[1];
     int nk = atoi(argv[2]), no = atoi(argv[3]);
     double npt = cpucycles_ns_per_tick();
+    const char *wm = getenv("WARMUP_MS");
+    pq_spin_ms(wm ? (unsigned)atoi(wm) : 200);
+    double g0, g1;
     int nmax = nk > no ? nk : no;
     uint64_t *t = xmalloc(sizeof(uint64_t) * (size_t)nmax);
 
     /* keygen */
+    g0 = pq_core_ghz();
     for (int i = 0; i < nk; i++) {
         uint64_t t0 = cpucycles();
         EVP_PKEY *k = keygen(alg);
         t[i] = cpucycles() - t0;
         EVP_PKEY_free(k);
     }
+    g1 = pq_core_ghz();
     EVP_PKEY *key = keygen(alg);
     size_t pk_len = 0, ct_len = 0, ss_len = 0;
     if (!EVP_PKEY_get_octet_string_param(key, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0, &pk_len))
         pk_len = 0;
     EVP_PKEY_CTX *ec = kem_ctx(key, alg, 1);
     if (EVP_PKEY_encapsulate(ec, NULL, &ct_len, NULL, &ss_len) <= 0) ossl_die("encapsulate(size)");
-    report(alg, "keygen", t, nk, npt, pk_len, ct_len, ss_len);
+    report(alg, "keygen", t, nk, npt, pk_len, ct_len, ss_len, g0, g1);
 
     /* encaps: one context, reused, like a TLS client would */
     uint8_t *ct = xmalloc(ct_len), *ss = xmalloc(ss_len), *ss2 = xmalloc(ss_len);
+    g0 = pq_core_ghz();
     for (int i = 0; i < no; i++) {
         size_t cl = ct_len, sl = ss_len;
         uint64_t t0 = cpucycles();
         if (EVP_PKEY_encapsulate(ec, ct, &cl, ss, &sl) <= 0) ossl_die("encapsulate");
         t[i] = cpucycles() - t0;
     }
-    report(alg, "encaps", t, no, npt, pk_len, ct_len, ss_len);
+    g1 = pq_core_ghz();
+    report(alg, "encaps", t, no, npt, pk_len, ct_len, ss_len, g0, g1);
 
     /* decaps */
     EVP_PKEY_CTX *dc = kem_ctx(key, alg, 0);
+    g0 = pq_core_ghz();
     for (int i = 0; i < no; i++) {
         size_t sl = ss_len;
         uint64_t t0 = cpucycles();
         if (EVP_PKEY_decapsulate(dc, ss2, &sl, ct, ct_len) <= 0) ossl_die("decapsulate");
         t[i] = cpucycles() - t0;
     }
+    g1 = pq_core_ghz();
     if (memcmp(ss, ss2, ss_len)) die("%s: shared secrets differ", alg);
-    report(alg, "decaps", t, no, npt, pk_len, ct_len, ss_len);
+    report(alg, "decaps", t, no, npt, pk_len, ct_len, ss_len, g0, g1);
 
     EVP_PKEY_CTX_free(ec);
     EVP_PKEY_CTX_free(dc);
