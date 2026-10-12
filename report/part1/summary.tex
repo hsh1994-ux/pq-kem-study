@@ -134,35 +134,20 @@ Now both sides hold the same 32-byte secret. Think of the client sending an open
 \label{tab:full}
 \end{table}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.66\linewidth]{fig/tradeoff.pdf}
-\caption{The same results as a picture: time vs.\ bytes sent. Bottom-left is best (fast and small). Methods right of the grey line do not fit in one TLS message.}
-\end{figure}
-
-\begin{table}[tb]
+\begin{table}[H]
 \centering\small
 
 \input{tab/sum_ops.tex}
 \caption{Each step separately: median time per call, best code version. For McEliece, KeyGen is the slow step; for ML-KEM and HQC, Decaps is slowest.}
 \end{table}
 
-\begin{table}[tb]
+\begin{table}[H]
+\textbf{Portable C vs.\ optimised code} (Table~\ref{tab:impl}). liboqs has two versions of each method: \emph{portable C}, which runs on any processor, and \emph{optimised} code that uses the processor's vector instructions (AVX2 on Intel, NEON on the M4). Both versions were timed on both computers.\par\medskip
 \centering\footnotesize
 \input{tab/sum_impl.tex}
-\caption{Optimised code and memory. Speed-up = time of the plain version / time of the optimised version (1.0× = no optimised code exists). Memory = peak working memory (stack) of the most demanding step.}
+\caption{Portable C vs.\ optimised code: time for one whole key exchange (KeyGen + Encaps + Decaps). Speed-up = portable time / optimised time. "Same code" = liboqs has no optimised version for this processor, so both versions run the same C code (small differences there are measurement noise: McEliece KeyGen restarts a random number of times). McEliece's whole exchange is dominated by KeyGen; its Decaps step alone is 510--1,400× faster with AVX2. Memory = peak working memory (stack) of the most demanding step.}
+\label{tab:impl}
 \end{table}
-
-\head{6\quad What we found}
-\begin{enumerate}[leftmargin=1.4em]
-\item \key{ML-KEM is faster than today's X25519} at every strength level: \invMmlkemIII× (M4) and \invImlkemIII× (Intel) at level 3, and still faster at level 5. Its cost is \key{size}, not time: it sends 25–49× more bytes, about 1.5–3\,KB. The reason: ML-KEM works on many small 12-bit numbers that a CPU handles in batches, while X25519 needs thousands of slow steps on 255-bit numbers.
-\item \key{The hybrid costs \relMhybrid–\relIhybrid× X25519}, almost exactly X25519 plus ML-KEM added together, so combining them costs nothing extra.
-\item \key{The cautious methods are much more expensive, in both time and size.} At level 1: HQC \relMhqcI–\relIhqcI× the time of X25519, FrodoKEM \relIfrodoI–\relMfrodoI×, McEliece \relImceI–\relMmceI×. They send 4–14× more bytes than ML-KEM; McEliece's public key (0.26–1\,MB) is too big for TLS. Moving from level 1 to 5 multiplies the cost by about 2.3 for ML-KEM and by 3.4–7 for the others.
-\item \key{The code version matters as much as the method.} Optimised Intel code makes ML-KEM and FrodoKEM about 3× faster and McEliece's Decaps 510–1,400× faster. On the M4, only ML-KEM has optimised code (1.4–1.7× faster). So the M4 is 2.2× faster than the Intel laptop on plain code but slower for FrodoKEM and McEliece. liboqs has no optimised HQC; HQC's designers report code 33–49× faster than what we measured.
-\item \key{Memory:} ML-KEM needs only 10–21\,KB of working memory; HQC and FrodoKEM 60–200\,KB; McEliece up to 1.5\,MB, too much for small devices.
-\item \key{Processor speed changes during the test:} the Intel CPU slows from 3.9 to 3.2\,GHz while running optimised code; the M4 stayed between 4.0 and 4.44\,GHz.
-\item \key{Our numbers agree with published ones} for HQC, McEliece Encaps/Decaps and all key sizes. ML-KEM and FrodoKEM are faster than the 2021 figures (newer code). \key{One open question:} McEliece-348864 key generation takes 2.6× the published time.
-\end{enumerate}
 
 {\small\color{ink2}\textbf{Limits:} both computers run Linux inside a virtual machine; one processor of each kind; the Intel time conversion varied 2.4\% between sessions (CPU-cycle results are not affected). \textbf{Next (Part 2):} real TLS connections under network delay and loss (E2), and tests for secret-dependent timing leaks (E3). All details and tables are in the full Part 1 report; code and data at \texttt{github.com/hsh1994-ux/pq-kem-study}. Prepared with help from Claude (Anthropic); the design and interpretation are the author's.\par}
 

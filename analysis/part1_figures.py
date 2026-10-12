@@ -637,21 +637,25 @@ def summary_tables(e1, e4):
     tex_table("sum_ops.tex", ["Method", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps"], rows, "lrrrrrr",
               top=r" & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ "
                   r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}")
-    # C: optimised code and memory
+    # C: portable C (ref) vs optimised code (opt), whole exchange, plus memory
     rows = []
     for a in KEMS:
         if a in ("HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
             rows.append("MID")
         r = [name(a)]
         for arch in ("x86_64", "aarch64"):
-            q = e1[arch][e1[arch].alg == a].pivot_table(index="op", columns="tier", values="median_ns")
-            r += [(lambda v: f"{v:.1f}×" if v < 10 else f"{v:,.0f}×")(q.loc[op, "ref"] / q.loc[op, "opt"]) for op in OPS]
+            q = e1[arch][e1[arch].alg == a].pivot_table(index="op", columns="tier", values="us")
+            ref, opt = q["ref"].sum(), q["opt"].sum()
+            sp = ref / opt
+            has_opt = a.startswith("ML-KEM") or (arch == "x86_64" and not a.startswith("HQC"))
+            r += [t(ref), t(opt), x(sp) if has_opt else "same code"]
         st = d[(d.tier == "opt") & (d.alg == a)].stack_bytes.max() / 1024
         r.append(f"{st:,.0f}")
         rows.append(r)
-    tex_table("sum_impl.tex", ["Method", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps", "(KiB)"],
+    tex_table("sum_impl.tex", ["Method", "Portable C", "Optimised", "Speed-up", "Portable C", "Optimised", "Speed-up",
+                               "(KiB)"],
               rows, "lrrrrrrr",
-              top=r" & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2)}} & \multicolumn{3}{c}{\textbf{Apple M4 (NEON)}} & "
+              top=r" & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2 code)}} & \multicolumn{3}{c}{\textbf{Apple M4 (NEON code)}} & "
                   r"\textbf{Memory} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}")
     # D: correctness
     checks = [("kat", "1. Answers match known correct results", "all 12 KEMs, both versions"),
