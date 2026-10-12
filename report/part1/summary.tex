@@ -122,6 +122,7 @@ The \key{hybrid} sends ML-KEM's key share followed by X25519's (1,216 / 1,120\,B
 \item \key{Same software on both machines}: Ubuntu 24.04, GCC 13.3, liboqs 0.16.0, OpenSSL 3.5.8; only the CPU differs (M4 in Docker Desktop, i7 in WSL2).
 \item \key{Three builds}: liboqs \texttt{ref} (portable C), liboqs \texttt{opt} (AVX2/NEON), OpenSSL (X25519, ML-KEM, hybrid). Optimised code exists for ML-KEM on both CPUs, for FrodoKEM and McEliece only on x86, for HQC on neither.
 \item \key{Timing}: every call timed with the CPU counter, 1,000 calls per operation (McEliece keygen 100), \key{median} and IQR; per-run calibration, 200\,ms warm-up, 30\,s cooldown (fanless Air), core clock estimated so results can also be given in cycles.
+\item \key{McEliece keygen: 100 samples} (\texttt{N\_MCE\_KEYGEN=100}). One key generation takes 40–500\,ms and makes a public key of up to 1\,MB, so 1,000 runs would add hours. It is also a try-until-it-works process: it picks a random secret, tries to bring the public matrix into systematic form (succeeds $\approx$29\% of the time) and otherwise starts again. The number of retries is random, so its spread is 55–120\% (vs.\ $\sim$1\% for most operations); 20 samples gave an unstable median, 100 a stable one. This is also why McEliece keygen shows "speed-ups" of 0.95–1.7× on the M4 without any optimised code.
 \end{itemize}
 
 \newpage
