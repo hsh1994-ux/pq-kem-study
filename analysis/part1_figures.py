@@ -86,7 +86,7 @@ def meta(path):
 
 def save(fig, name):
     FIG.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIG / f"{name}.pdf")
+    fig.savefig(FIG / f"{name}.pdf", metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)
 
 
