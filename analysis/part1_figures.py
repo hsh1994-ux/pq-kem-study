@@ -654,11 +654,11 @@ def summary_tables(e1, e4):
               top=r" & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2)}} & \multicolumn{3}{c}{\textbf{Apple M4 (NEON)}} & "
                   r"\textbf{Memory} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}")
     # D: correctness
-    checks = [("kat", "Answers match known correct results", "all 12, both versions"),
-              ("acvp", "NIST official FIPS 203 test vectors", "ML-KEM"),
-              ("selftest", "Random exchanges give the same secret", "all 12, both versions"),
-              ("cross", "Keys from one version work with the other", "all 12"),
-              ("openssl", "liboqs and OpenSSL work together", "ML-KEM")]
+    checks = [("kat", "1. Answers match known correct results", "all 12 KEMs, both versions"),
+              ("acvp", "2. NIST official FIPS 203 test vectors", "ML-KEM only"),
+              ("selftest", "3. Random exchanges give the same secret", "all 12 KEMs, both versions"),
+              ("cross", "4. Keys from one version work with the other", "all 12 KEMs"),
+              ("openssl", "5. liboqs and OpenSSL work together", "ML-KEM only")]
     rows = []
     for c, what, applies in checks:
         r = [what, applies]
