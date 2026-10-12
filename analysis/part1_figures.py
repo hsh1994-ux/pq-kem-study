@@ -618,8 +618,8 @@ def summary_tables(e1, e4):
     def tiers(arch, a):  # median µs per op for the portable (ref) and optimised (opt) builds
         q = e1[arch][e1[arch].alg == a].pivot_table(index="op", columns="tier", values="us")
         return q["ref"], q["opt"]
-    same = r"\textcolor{ink2}{\scriptsize same code}"
-    # A: whole key exchange, portable C vs optimised, plus memory
+    # A: whole key exchange, portable C vs optimised, plus memory.
+    # "vs X25519" uses the faster of the two versions; "–" = no optimised code for this CPU.
     rows = []
     for a in order:
         if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
@@ -628,14 +628,17 @@ def summary_tables(e1, e4):
         mem = "–" if a in BASE else f"{d[(d.tier == 'opt') & (d.alg == a)].stack_bytes.max() / 1024:,.0f}"
         r = [name(a), lvl(a), f"{b:,}", mem]
         for arch in MACH:
-            v = fx[arch][a]
             if a in BASE:
+                v = fx[arch][a]
                 r += ["–", t(v)]
-            elif has_opt(a, arch):
-                ref, _ = tiers(arch, a)
-                r += [t(ref.sum()), rf"{t(v)} {{\scriptsize({x(ref.sum() / v)})}}"]
             else:
-                r += [same, t(v)]
+                ref, opt = (s_.sum() for s_ in tiers(arch, a))
+                if has_opt(a, arch):
+                    v = min(ref, opt)
+                    r += [t(ref), rf"{t(opt)} {{\scriptsize({x(ref / opt)})}}"]
+                else:
+                    v = ref
+                    r += [t(ref), "–"]
             r.append(x(v / fx[arch]["X25519-ECDH"]))
         rows.append(r)
     tex_table("sum_full.tex", ["Method", "Level", "Bytes sent", "Memory",
@@ -643,25 +646,28 @@ def summary_tables(e1, e4):
               rows, "lrrrrrrrrr",
               top=r" & & & & \multicolumn{3}{c}{\textbf{Apple M4 (NEON code)}} & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2 code)}} \\ "
                   r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}")
-    # B: per step, optimised row plus a portable-C row where optimised code exists
+    # B: per step, one row per code version
     rows = []
     for a in order:
         if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
             rows.append("MID")
-        r, rp = [name(a)], [r"\quad\textcolor{ink2}{portable C}"]
+        if a in BASE:
+            r = [name(a), "OpenSSL"]
+            for arch in MACH:
+                bb = best(e1[arch]).set_index(["alg", "op"])
+                r += [t(bb.loc[(a, op)].us) for op in OPS]
+            rows.append(r)
+            continue
+        rp, ro = [name(a), "portable"], ["", "optimised"]
         for arch in MACH:
-            bb = best(e1[arch]).set_index(["alg", "op"])
-            r += [t(bb.loc[(a, op)].us) for op in OPS]
-            if a not in BASE:
-                ref, _ = tiers(arch, a)
-                rp += ([rf"\textcolor{{ink2}}{{{t(ref[op])}}}" for op in OPS] if has_opt(a, arch)
-                       else [rf"\multicolumn{{3}}{{c}}{{{same}}}"])
-        rows.append(r)
-        if a not in BASE and (has_opt(a, "aarch64") or has_opt(a, "x86_64")):
-            rows.append(rp)
-    tex_table("sum_ops.tex", ["Method", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps"], rows, "lrrrrrr",
-              top=r" & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ "
-                  r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}")
+            ref, opt = tiers(arch, a)
+            rp += [t(ref[op]) for op in OPS]
+            ro += [t(opt[op]) for op in OPS] if has_opt(a, arch) else ["–"] * 3
+        rows += [rp, ro]
+    tex_table("sum_ops.tex", ["Method", "Code", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps"], rows,
+              "llrrrrrr",
+              top=r" & & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ "
+                  r"\cmidrule(lr){3-5}\cmidrule(lr){6-8}")
     # D: correctness
     checks = [("kat", "1. Answers match known correct results", "all 12 KEMs, both versions"),
               ("acvp", "2. NIST official FIPS 203 test vectors", "ML-KEM only"),
