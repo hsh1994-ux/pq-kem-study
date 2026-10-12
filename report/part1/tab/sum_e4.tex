@@ -1,0 +1,13 @@
+\begin{tabular}{llll}
+\toprule
+What is checked & Applies to & M4: passed & Intel: passed \\
+\midrule
+Answers match known correct results & all 12, both versions & 24/24 (24 cases) & 24/24 (24 cases) \\
+NIST official FIPS 203 test vectors & ML-KEM & 6/6 (360 cases) & 6/6 (360 cases) \\
+Random exchanges give the same secret & all 12, both versions & 24/24 (918 cases) & 24/24 (918 cases) \\
+Keys from one version work with the other & all 12 & 12/12 (24 cases) & 12/12 (24 cases) \\
+liboqs and OpenSSL work together & ML-KEM & 3/3 (6 cases) & 3/3 (6 cases) \\
+\midrule
+\textbf{Total} &  & \textbf{69/69 (1,332 cases)} & \textbf{69/69 (1,332 cases)} \\
+\bottomrule
+\end{tabular}

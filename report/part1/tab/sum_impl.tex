@@ -1,0 +1,22 @@
+\begin{tabular}{lrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2)}} & \multicolumn{3}{c}{\textbf{Apple M4 (NEON)}} & \textbf{Memory} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}
+Method & KeyGen & Encaps & Decaps & KeyGen & Encaps & Decaps & (KiB) \\
+\midrule
+ML-KEM-512 & 3.2× & 3.2× & 3.0× & 1.6× & 1.5× & 1.5× & 10 \\
+ML-KEM-768 & 3.2× & 3.0× & 2.8× & 1.7× & 1.4× & 1.5× & 15 \\
+ML-KEM-1024 & 3.5× & 3.1× & 2.8× & 1.7× & 1.4× & 1.4× & 21 \\
+\midrule
+HQC-1 & 1.1× & 1.0× & 1.0× & 1.0× & 1.0× & 1.0× & 62 \\
+HQC-3 & 1.0× & 1.0× & 1.0× & 1.0× & 1.0× & 1.0× & 127 \\
+HQC-5 & 1.0× & 1.0× & 1.0× & 1.0× & 1.0× & 0.9× & 204 \\
+\midrule
+Frodo-640 & 2.9× & 2.8× & 2.8× & 1.0× & 1.0× & 1.0× & 75 \\
+Frodo-976 & 3.1× & 3.0× & 3.0× & 1.0× & 1.0× & 1.0× & 116 \\
+Frodo-1344 & 3.1× & 3.3× & 3.6× & 1.0× & 1.0× & 1.0× & 160 \\
+\midrule
+McEliece-348864 & 1.8× & 3.6× & 511× & 1.3× & 1.0× & 1.0× & 412 \\
+McEliece-460896 & 2.1× & 3.1× & 574× & 1.0× & 0.9× & 1.0× & 864 \\
+McEliece-6688128 & 3.7× & 3.9× & 1,405× & 1.7× & 1.0× & 1.0× & 1,529 \\
+\bottomrule
+\end{tabular}

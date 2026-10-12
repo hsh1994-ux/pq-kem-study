@@ -501,9 +501,10 @@ def fig_stack(e1):
 
 
 # ---------------------------------------------------------------- tables
-def tex_table(path, header, rows, colspec, caption=None):
+def tex_table(path, header, rows, colspec, caption=None, top=None):
     TAB.mkdir(parents=True, exist_ok=True)
-    lines = [r"\begin{tabular}{" + colspec + "}", r"\toprule", " & ".join(header) + r" \\", r"\midrule"]
+    lines = [r"\begin{tabular}{" + colspec + "}", r"\toprule"] + ([top] if top else []) + \
+            [" & ".join(header) + r" \\", r"\midrule"]
     for r in rows:
         lines.append(r"\midrule" if r == "MID" else " & ".join(r) + r" \\")
     lines += [r"\bottomrule", r"\end{tabular}"]
@@ -596,6 +597,81 @@ def tables(e1, e4, md):
     (TAB / "numbers.tex").write_text("\n".join(mac) + "\n")
 
 
+def summary_tables(e1, e4):
+    """Compact plain-language tables for the 3-page summary (tab/sum_*.tex)."""
+    order = BASE + KEMS
+    name = lambda a: {"X25519-ECDH": "X25519 (today)", "X25519MLKEM768": "Hybrid X25519+ML-KEM-768"}.get(a, short(a))
+    lvl = lambda a: str(LEVEL.get(a, "–"))
+    def t(us):
+        for div, unit in ((1e6, "s"), (1e3, "ms"), (1, "µs")):
+            if us >= div or unit == "µs":
+                v = us / div
+                txt = f"{v:.2f}" if v < 10 else f"{v:.1f}" if v < 100 else f"{v:,.0f}"
+                return txt + r"\," + unit
+    def x(v):
+        return (f"{v:.2f}×" if v < 1 else f"{v:.1f}×" if v < 10 else f"{v:.0f}×" if v < 100 else f"{v:,.0f}×")
+    fx = {a: full_exchange(e1[a]) for a in MACH}
+    d = e1["aarch64"]
+    sz = d[d.op == "keygen"].drop_duplicates("alg").set_index("alg")
+    # A: whole key exchange
+    rows = []
+    for a in order:
+        if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
+            rows.append("MID")
+        b = int(sz.loc[a].pk_bytes + sz.loc[a].ct_bytes)
+        m, i = fx["aarch64"][a], fx["x86_64"][a]
+        rows.append([name(a), lvl(a), f"{b:,}", t(m), x(m / fx["aarch64"]["X25519-ECDH"]),
+                     t(i), x(i / fx["x86_64"]["X25519-ECDH"])])
+    tex_table("sum_full.tex", ["Method", "Level", "Bytes sent", "Time (M4)", "vs X25519", "Time (Intel)", "vs X25519"],
+              rows, "lrrrrrr")
+    # B: per step
+    rows = []
+    for a in order:
+        if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
+            rows.append("MID")
+        r = [name(a)]
+        for arch in MACH:
+            bb = best(e1[arch]).set_index(["alg", "op"])
+            r += [t(bb.loc[(a, op)].us) for op in OPS]
+        rows.append(r)
+    tex_table("sum_ops.tex", ["Method", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps"], rows, "lrrrrrr",
+              top=r" & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ "
+                  r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}")
+    # C: optimised code and memory
+    rows = []
+    for a in KEMS:
+        if a in ("HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
+            rows.append("MID")
+        r = [name(a)]
+        for arch in ("x86_64", "aarch64"):
+            q = e1[arch][e1[arch].alg == a].pivot_table(index="op", columns="tier", values="median_ns")
+            r += [(lambda v: f"{v:.1f}×" if v < 10 else f"{v:,.0f}×")(q.loc[op, "ref"] / q.loc[op, "opt"]) for op in OPS]
+        st = d[(d.tier == "opt") & (d.alg == a)].stack_bytes.max() / 1024
+        r.append(f"{st:,.0f}")
+        rows.append(r)
+    tex_table("sum_impl.tex", ["Method", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps", "(KiB)"],
+              rows, "lrrrrrrr",
+              top=r" & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2)}} & \multicolumn{3}{c}{\textbf{Apple M4 (NEON)}} & "
+                  r"\textbf{Memory} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}")
+    # D: correctness
+    checks = [("kat", "Answers match known correct results", "all 12, both versions"),
+              ("acvp", "NIST official FIPS 203 test vectors", "ML-KEM"),
+              ("selftest", "Random exchanges give the same secret", "all 12, both versions"),
+              ("cross", "Keys from one version work with the other", "all 12"),
+              ("openssl", "liboqs and OpenSSL work together", "ML-KEM")]
+    rows = []
+    for c, what, applies in checks:
+        r = [what, applies]
+        for arch in MACH:
+            g = e4[arch][e4[arch].check == c]
+            r.append(f"{int((g.status == 'PASS').sum())}/{len(g)} ({int(g.passed.sum()):,} cases)")
+        rows.append(r)
+    rows.append("MID")
+    rows.append([r"\textbf{Total}", ""] + [rf"\textbf{{{int((e4[a].status == 'PASS').sum())}/{len(e4[a])} "
+                                         rf"({int(e4[a].passed.sum()):,} cases)}}" for a in MACH])
+    tex_table("sum_e4.tex", ["What is checked", "Applies to", "M4: passed", "Intel: passed"], rows, "llll")
+
+
 def main():
     e1, e4, md = load()
     for f in (fig_sizes, fig_full_exchange, fig_relative, fig_per_op, fig_tradeoff, fig_levels,
@@ -603,6 +679,7 @@ def main():
         f(e1)
     fig_e4(e4)
     tables(e1, e4, md)
+    summary_tables(e1, e4)
     print("inputs:", ", ".join(md[a]["file"] for a in MACH), ",", ", ".join(md[a]["e4file"] for a in MACH))
     print("wrote", len(list(FIG.glob('*.pdf'))), "figures and", len(list(TAB.glob('*.tex'))), "tables to", OUT)
 
