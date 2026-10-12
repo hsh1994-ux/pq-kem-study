@@ -126,27 +126,21 @@ Now both sides hold the same 32-byte secret. Think of the client sending an open
 \end{table}
 
 \head{5\quad E1: results}
-\textbf{One whole key exchange} (KeyGen + Encaps + Decaps, best code version). "vs X25519" is the time compared with X25519 on the same computer: below 1.0× means faster than X25519.
+\textbf{Which numbers?} liboqs has two versions of each method: \emph{portable C}, which runs on any processor, and \emph{optimised} code that uses the processor's vector instructions (AVX2 on Intel, NEON on the M4). Both were timed on both computers, and both are shown below. All comparisons ("vs X25519") use the \textbf{optimised} version, because that is what real software uses. X25519 and the hybrid are timed in OpenSSL, which has only an optimised version.
+
+\textbf{One whole key exchange} (KeyGen + Encaps + Decaps). "vs X25519" is the time compared with X25519 on the same computer: below 1.0× means faster than X25519.
 \begin{table}[H]
-\centering\footnotesize
+\centering\footnotesize\setlength{\tabcolsep}{3.9pt}
 \input{tab/sum_full.tex}
-\caption{Bytes sent and time for one key exchange. Level = NIST strength level (1, 3, 5 $\approx$ AES-128, -192, -256).}
+\caption{Bytes sent, memory and time for one key exchange. Level = NIST strength level (1, 3, 5 $\approx$ AES-128, -192, -256). Memory = peak working memory (stack, KiB) of the most demanding step. Portable = portable C. (\emph{n}×) after an optimised time = how many times faster it is than portable C. "Same code" = liboqs has no optimised version for this processor, so both versions are the same C code and one time is shown (the optimised build's).}
 \label{tab:full}
 \end{table}
 
 \begin{table}[H]
-\centering\small
+\centering\footnotesize
 
 \input{tab/sum_ops.tex}
-\caption{Each step separately: median time per call, best code version. For McEliece, KeyGen is the slow step; for ML-KEM and HQC, Decaps is slowest.}
-\end{table}
-
-\begin{table}[H]
-\textbf{Portable C vs.\ optimised code} (Table~\ref{tab:impl}). liboqs has two versions of each method: \emph{portable C}, which runs on any processor, and \emph{optimised} code that uses the processor's vector instructions (AVX2 on Intel, NEON on the M4). Both versions were timed on both computers.\par\medskip
-\centering\footnotesize
-\input{tab/sum_impl.tex}
-\caption{Portable C vs.\ optimised code: time for one whole key exchange (KeyGen + Encaps + Decaps). Speed-up = portable time / optimised time. "Same code" = liboqs has no optimised version for this processor, so both versions run the same C code (small differences there are measurement noise: McEliece KeyGen restarts a random number of times). McEliece's whole exchange is dominated by KeyGen; its Decaps step alone is 510--1,400× faster with AVX2. Memory = peak working memory (stack) of the most demanding step.}
-\label{tab:impl}
+\caption{Each step separately: median time per call. Black = optimised version, grey = portable C (where it differs). For McEliece, KeyGen is the slow step, and the optimised Intel code makes Decaps 510--1,400× faster; for ML-KEM and HQC, Decaps is slowest. McEliece KeyGen times vary a lot from run to run (random retries, see section 3).}
 \end{table}
 
 {\small\color{ink2}\textbf{Limits:} both computers run Linux inside a virtual machine; one processor of each kind; the Intel time conversion varied 2.4\% between sessions (CPU-cycle results are not affected). \textbf{Next (Part 2):} real TLS connections under network delay and loss (E2), and tests for secret-dependent timing leaks (E3). All details and tables are in the full Part 1 report; code and data at \texttt{github.com/hsh1994-ux/pq-kem-study}. Prepared with help from Claude (Anthropic); the design and interpretation are the author's.\par}

@@ -613,50 +613,55 @@ def summary_tables(e1, e4):
     fx = {a: full_exchange(e1[a]) for a in MACH}
     d = e1["aarch64"]
     sz = d[d.op == "keygen"].drop_duplicates("alg").set_index("alg")
-    # A: whole key exchange
+    def has_opt(a, arch):  # does liboqs have optimised (SIMD) code for this KEM on this CPU?
+        return a.startswith("ML-KEM") or (arch == "x86_64" and not a.startswith("HQC"))
+    def tiers(arch, a):  # median µs per op for the portable (ref) and optimised (opt) builds
+        q = e1[arch][e1[arch].alg == a].pivot_table(index="op", columns="tier", values="us")
+        return q["ref"], q["opt"]
+    same = r"\textcolor{ink2}{\scriptsize same code}"
+    # A: whole key exchange, portable C vs optimised, plus memory
     rows = []
     for a in order:
         if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
             rows.append("MID")
         b = int(sz.loc[a].pk_bytes + sz.loc[a].ct_bytes)
-        m, i = fx["aarch64"][a], fx["x86_64"][a]
-        rows.append([name(a), lvl(a), f"{b:,}", t(m), x(m / fx["aarch64"]["X25519-ECDH"]),
-                     t(i), x(i / fx["x86_64"]["X25519-ECDH"])])
-    tex_table("sum_full.tex", ["Method", "Level", "Bytes sent", "Time (M4)", "vs X25519", "Time (Intel)", "vs X25519"],
-              rows, "lrrrrrr")
-    # B: per step
+        mem = "–" if a in BASE else f"{d[(d.tier == 'opt') & (d.alg == a)].stack_bytes.max() / 1024:,.0f}"
+        r = [name(a), lvl(a), f"{b:,}", mem]
+        for arch in MACH:
+            v = fx[arch][a]
+            if a in BASE:
+                r += ["–", t(v)]
+            elif has_opt(a, arch):
+                ref, _ = tiers(arch, a)
+                r += [t(ref.sum()), rf"{t(v)} {{\scriptsize({x(ref.sum() / v)})}}"]
+            else:
+                r += [same, t(v)]
+            r.append(x(v / fx[arch]["X25519-ECDH"]))
+        rows.append(r)
+    tex_table("sum_full.tex", ["Method", "Level", "Bytes sent", "Memory",
+                               "Portable", "Optimised", "vs X25519", "Portable", "Optimised", "vs X25519"],
+              rows, "lrrrrrrrrr",
+              top=r" & & & & \multicolumn{3}{c}{\textbf{Apple M4 (NEON code)}} & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2 code)}} \\ "
+                  r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}")
+    # B: per step, optimised row plus a portable-C row where optimised code exists
     rows = []
     for a in order:
         if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
             rows.append("MID")
-        r = [name(a)]
+        r, rp = [name(a)], [r"\quad\textcolor{ink2}{portable C}"]
         for arch in MACH:
             bb = best(e1[arch]).set_index(["alg", "op"])
             r += [t(bb.loc[(a, op)].us) for op in OPS]
+            if a not in BASE:
+                ref, _ = tiers(arch, a)
+                rp += ([rf"\textcolor{{ink2}}{{{t(ref[op])}}}" for op in OPS] if has_opt(a, arch)
+                       else [rf"\multicolumn{{3}}{{c}}{{{same}}}"])
         rows.append(r)
+        if a not in BASE and (has_opt(a, "aarch64") or has_opt(a, "x86_64")):
+            rows.append(rp)
     tex_table("sum_ops.tex", ["Method", "KeyGen", "Encaps", "Decaps", "KeyGen", "Encaps", "Decaps"], rows, "lrrrrrr",
               top=r" & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ "
                   r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}")
-    # C: portable C (ref) vs optimised code (opt), whole exchange, plus memory
-    rows = []
-    for a in KEMS:
-        if a in ("HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
-            rows.append("MID")
-        r = [name(a)]
-        for arch in ("x86_64", "aarch64"):
-            q = e1[arch][e1[arch].alg == a].pivot_table(index="op", columns="tier", values="us")
-            ref, opt = q["ref"].sum(), q["opt"].sum()
-            sp = ref / opt
-            has_opt = a.startswith("ML-KEM") or (arch == "x86_64" and not a.startswith("HQC"))
-            r += [t(ref), t(opt), x(sp) if has_opt else "same code"]
-        st = d[(d.tier == "opt") & (d.alg == a)].stack_bytes.max() / 1024
-        r.append(f"{st:,.0f}")
-        rows.append(r)
-    tex_table("sum_impl.tex", ["Method", "Portable C", "Optimised", "Speed-up", "Portable C", "Optimised", "Speed-up",
-                               "(KiB)"],
-              rows, "lrrrrrrr",
-              top=r" & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2 code)}} & \multicolumn{3}{c}{\textbf{Apple M4 (NEON code)}} & "
-                  r"\textbf{Memory} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}")
     # D: correctness
     checks = [("kat", "1. Answers match known correct results", "all 12 KEMs, both versions"),
               ("acvp", "2. NIST official FIPS 203 test vectors", "ML-KEM only"),

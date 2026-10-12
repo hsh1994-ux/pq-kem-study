@@ -7,19 +7,28 @@ X25519 (today) & 13.2\,µs & 31.2\,µs & 18.0\,µs & 27.4\,µs & 57.4\,µs & 29.
 Hybrid X25519+ML-KEM-768 & 30.1\,µs & 38.9\,µs & 31.0\,µs & 59.1\,µs & 73.7\,µs & 57.7\,µs \\
 \midrule
 ML-KEM-512 & 5.21\,µs & 5.67\,µs & 6.71\,µs & 5.85\,µs & 6.52\,µs & 8.46\,µs \\
+\quad\textcolor{ink2}{portable C} & \textcolor{ink2}{8.54\,µs} & \textcolor{ink2}{8.33\,µs} & \textcolor{ink2}{9.96\,µs} & \textcolor{ink2}{18.5\,µs} & \textcolor{ink2}{20.7\,µs} & \textcolor{ink2}{25.1\,µs} \\
 ML-KEM-768 & 8.50\,µs & 8.96\,µs & 10.5\,µs & 9.60\,µs & 10.3\,µs & 13.2\,µs \\
+\quad\textcolor{ink2}{portable C} & \textcolor{ink2}{14.5\,µs} & \textcolor{ink2}{13.0\,µs} & \textcolor{ink2}{15.2\,µs} & \textcolor{ink2}{30.6\,µs} & \textcolor{ink2}{30.9\,µs} & \textcolor{ink2}{37.1\,µs} \\
 ML-KEM-1024 & 12.8\,µs & 13.7\,µs & 15.9\,µs & 13.3\,µs & 14.6\,µs & 18.6\,µs \\
+\quad\textcolor{ink2}{portable C} & \textcolor{ink2}{22.4\,µs} & \textcolor{ink2}{19.7\,µs} & \textcolor{ink2}{22.5\,µs} & \textcolor{ink2}{46.1\,µs} & \textcolor{ink2}{44.7\,µs} & \textcolor{ink2}{52.6\,µs} \\
 \midrule
 HQC-1 & 561\,µs & 1.12\,ms & 1.72\,ms & 1.16\,ms & 2.36\,ms & 3.83\,ms \\
 HQC-3 & 1.69\,ms & 3.53\,ms & 5.14\,ms & 3.58\,ms & 7.17\,ms & 10.9\,ms \\
 HQC-5 & 3.72\,ms & 7.56\,ms & 12.4\,ms & 8.80\,ms & 18.1\,ms & 26.7\,ms \\
 \midrule
 Frodo-640 & 873\,µs & 927\,µs & 918\,µs & 681\,µs & 785\,µs & 767\,µs \\
+\quad\textcolor{ink2}{portable C} & \multicolumn{3}{c}{\textcolor{ink2}{\scriptsize same code}} & \textcolor{ink2}{2.01\,ms} & \textcolor{ink2}{2.16\,ms} & \textcolor{ink2}{2.15\,ms} \\
 Frodo-976 & 1.91\,ms & 2.07\,ms & 2.05\,ms & 1.44\,ms & 1.60\,ms & 1.56\,ms \\
+\quad\textcolor{ink2}{portable C} & \multicolumn{3}{c}{\textcolor{ink2}{\scriptsize same code}} & \textcolor{ink2}{4.45\,ms} & \textcolor{ink2}{4.77\,ms} & \textcolor{ink2}{4.73\,ms} \\
 Frodo-1344 & 3.57\,ms & 3.79\,ms & 3.75\,ms & 2.58\,ms & 2.59\,ms & 2.41\,ms \\
+\quad\textcolor{ink2}{portable C} & \multicolumn{3}{c}{\textcolor{ink2}{\scriptsize same code}} & \textcolor{ink2}{8.06\,ms} & \textcolor{ink2}{8.65\,ms} & \textcolor{ink2}{8.59\,ms} \\
 \midrule
 McEliece-348864 & 38.6\,ms & 32.6\,µs & 13.9\,ms & 38.6\,ms & 13.0\,µs & 36.5\,µs \\
+\quad\textcolor{ink2}{portable C} & \multicolumn{3}{c}{\textcolor{ink2}{\scriptsize same code}} & \textcolor{ink2}{71.4\,ms} & \textcolor{ink2}{46.8\,µs} & \textcolor{ink2}{18.6\,ms} \\
 McEliece-460896 & 141\,ms & 73.8\,µs & 24.7\,ms & 113\,ms & 29.3\,µs & 73.1\,µs \\
+\quad\textcolor{ink2}{portable C} & \multicolumn{3}{c}{\textcolor{ink2}{\scriptsize same code}} & \textcolor{ink2}{234\,ms} & \textcolor{ink2}{90.5\,µs} & \textcolor{ink2}{41.9\,ms} \\
 McEliece-6688128 & 239\,ms & 121\,µs & 47.7\,ms & 134\,ms & 39.4\,µs & 68.0\,µs \\
+\quad\textcolor{ink2}{portable C} & \multicolumn{3}{c}{\textcolor{ink2}{\scriptsize same code}} & \textcolor{ink2}{496\,ms} & \textcolor{ink2}{153\,µs} & \textcolor{ink2}{95.6\,ms} \\
 \bottomrule
 \end{tabular}
