@@ -599,8 +599,10 @@ def tables(e1, e4, md):
 
 def summary_tables(e1, e4):
     """Compact plain-language tables for the 3-page summary (tab/sum_*.tex)."""
-    order = BASE + KEMS
-    name = lambda a: {"X25519-ECDH": "X25519 (today)", "X25519MLKEM768": "Hybrid X25519+ML-KEM-768"}.get(a, short(a))
+    bases = ["X25519-ECDH", "X25519-DHKEM", "X25519MLKEM768"]
+    order = bases + KEMS
+    name = lambda a: {"X25519-ECDH": "X25519 DH (today)", "X25519-DHKEM": "X25519 KEM (DHKEM)",
+                      "X25519MLKEM768": "Hybrid X25519+ML-KEM-768"}.get(a, short(a))
     lvl = lambda a: str(LEVEL.get(a, "–"))
     def t(us):
         for div, unit in ((1e6, "s"), (1e3, "ms"), (1, "µs")):
@@ -609,7 +611,7 @@ def summary_tables(e1, e4):
                 txt = f"{v:.2f}" if v < 10 else f"{v:.1f}" if v < 100 else f"{v:,.0f}"
                 return txt + r"\," + unit
     def x(v):
-        return (f"{v:.2f}×" if v < 1 else f"{v:.1f}×" if v < 10 else f"{v:.0f}×" if v < 100 else f"{v:,.0f}×")
+        return (f"{v:.2f}×" if v < 2 else f"{v:.1f}×" if v < 10 else f"{v:.0f}×" if v < 100 else f"{v:,.0f}×")
     fx = {a: full_exchange(e1[a]) for a in MACH}
     d = e1["aarch64"]
     sz = d[d.op == "keygen"].drop_duplicates("alg").set_index("alg")
@@ -625,10 +627,10 @@ def summary_tables(e1, e4):
         if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
             rows.append("MID")
         b = int(sz.loc[a].pk_bytes + sz.loc[a].ct_bytes)
-        mem = "–" if a in BASE else f"{d[(d.tier == 'opt') & (d.alg == a)].stack_bytes.max() / 1024:,.0f}"
+        mem = "–" if a in bases else f"{d[(d.tier == 'opt') & (d.alg == a)].stack_bytes.max() / 1024:,.0f}"
         r = [name(a), lvl(a), f"{b:,}", mem]
         for arch in MACH:
-            if a in BASE:
+            if a in bases:
                 v = fx[arch][a]
                 r += ["–", t(v)]
             else:
@@ -651,7 +653,7 @@ def summary_tables(e1, e4):
     for a in order:
         if a in ("ML-KEM-512", "HQC-1", "FrodoKEM-640-SHAKE", "Classic-McEliece-348864"):
             rows.append("MID")
-        if a in BASE:
+        if a in bases:
             r = [name(a), "OpenSSL"]
             for arch in MACH:
                 bb = best(e1[arch]).set_index(["alg", "op"])

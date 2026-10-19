@@ -3,12 +3,13 @@
  & & & & \multicolumn{3}{c}{\textbf{Apple M4 (NEON code)}} & \multicolumn{3}{c}{\textbf{Intel i7 (AVX2 code)}} \\ \cmidrule(lr){5-7}\cmidrule(lr){8-10}
 Method & Level & Bytes sent & Memory & Portable & Optimised & vs X25519 & Portable & Optimised & vs X25519 \\
 \midrule
-X25519 (today) & – & 64 & – & – & 62.5\,µs & 1.0× & – & 115\,µs & 1.0× \\
-Hybrid X25519+ML-KEM-768 & – & 2,336 & – & – & 100\,µs & 1.6× & – & 191\,µs & 1.7× \\
+X25519 DH (today) & – & 64 & – & – & 62.5\,µs & 1.00× & – & 115\,µs & 1.00× \\
+X25519 KEM (DHKEM) & – & 64 & – & – & 71.5\,µs & 1.14× & – & 126\,µs & 1.10× \\
+Hybrid X25519+ML-KEM-768 & – & 2,336 & – & – & 100\,µs & 1.60× & – & 191\,µs & 1.66× \\
 \midrule
-ML-KEM-512 & 1 & 1,568 & 10 & 26.8\,µs & 17.6\,µs {\scriptsize(1.5×)} & 0.28× & 64.3\,µs & 20.8\,µs {\scriptsize(3.1×)} & 0.18× \\
-ML-KEM-768 & 3 & 2,272 & 15 & 42.7\,µs & 28.0\,µs {\scriptsize(1.5×)} & 0.45× & 98.6\,µs & 33.2\,µs {\scriptsize(3.0×)} & 0.29× \\
-ML-KEM-1024 & 5 & 3,136 & 21 & 64.5\,µs & 42.4\,µs {\scriptsize(1.5×)} & 0.68× & 143\,µs & 46.4\,µs {\scriptsize(3.1×)} & 0.40× \\
+ML-KEM-512 & 1 & 1,568 & 10 & 26.8\,µs & 17.6\,µs {\scriptsize(1.53×)} & 0.28× & 64.3\,µs & 20.8\,µs {\scriptsize(3.1×)} & 0.18× \\
+ML-KEM-768 & 3 & 2,272 & 15 & 42.7\,µs & 28.0\,µs {\scriptsize(1.53×)} & 0.45× & 98.6\,µs & 33.2\,µs {\scriptsize(3.0×)} & 0.29× \\
+ML-KEM-1024 & 5 & 3,136 & 21 & 64.5\,µs & 42.4\,µs {\scriptsize(1.52×)} & 0.68× & 143\,µs & 46.4\,µs {\scriptsize(3.1×)} & 0.40× \\
 \midrule
 HQC-1 & 1 & 6,674 & 62 & 3.39\,ms & – & 54× & 7.41\,ms & – & 65× \\
 HQC-3 & 3 & 13,492 & 127 & 10.1\,ms & – & 162× & 22.3\,ms & – & 195× \\

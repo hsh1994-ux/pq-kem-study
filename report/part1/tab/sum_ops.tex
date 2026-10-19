@@ -3,7 +3,8 @@
  & & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ \cmidrule(lr){3-5}\cmidrule(lr){6-8}
 Method & Code & KeyGen & Encaps & Decaps & KeyGen & Encaps & Decaps \\
 \midrule
-X25519 (today) & OpenSSL & 13.2\,µs & 31.2\,µs & 18.0\,µs & 27.4\,µs & 57.4\,µs & 29.9\,µs \\
+X25519 DH (today) & OpenSSL & 13.2\,µs & 31.2\,µs & 18.0\,µs & 27.4\,µs & 57.4\,µs & 29.9\,µs \\
+X25519 KEM (DHKEM) & OpenSSL & 15.0\,µs & 38.0\,µs & 18.5\,µs & 26.5\,µs & 58.2\,µs & 41.2\,µs \\
 Hybrid X25519+ML-KEM-768 & OpenSSL & 30.1\,µs & 38.9\,µs & 31.0\,µs & 59.1\,µs & 73.7\,µs & 57.7\,µs \\
 \midrule
 ML-KEM-512 & portable & 8.54\,µs & 8.33\,µs & 9.96\,µs & 18.5\,µs & 20.7\,µs & 25.1\,µs \\
