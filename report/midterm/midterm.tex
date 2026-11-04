@@ -1,19 +1,19 @@
 % Midterm report: E1 (performance) and E4 (correctness).
 % Build after analysis/part1_figures.py: cd report/midterm && latexmk -pdf midterm.tex
-\documentclass[10pt,a4paper]{article}
-\usepackage[margin=2.1cm,vmargin=1.6cm]{geometry}
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm,vmargin=1.7cm]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage{microtype,booktabs,enumitem,array,tabularx,float,caption}
 \usepackage[hidelinks]{hyperref}
 \usepackage[compact]{titlesec}
 \titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
-\setlist{leftmargin=1.5em,itemsep=1pt,topsep=3pt}
+\setlist{leftmargin=1.5em,itemsep=3pt,topsep=3pt}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{5pt}
+\setlength{\parskip}{7pt}
 \captionsetup{font=small,labelfont=bf,labelsep=period,skip=4pt}
-\setlength{\textfloatsep}{12pt}
-\setlength{\intextsep}{10pt}
+\setlength{\textfloatsep}{16pt}
+\setlength{\intextsep}{14pt}
 \DeclareUnicodeCharacter{00D7}{\ensuremath{\times}}
 \DeclareUnicodeCharacter{00B5}{\ensuremath{\mu}}
 \hypersetup{pdftitle={Midterm Report: Post-Quantum KEM Comparative Study},pdfauthor={Hamdan Al-Jabri}}
@@ -25,15 +25,6 @@
 Hamdan Al-Jabri (Neptun QUTC51)\\
 Cybersecurity Lab 1, ELTE Faculty of Informatics\\
 November 2026
-
-\begin{abstract}
-\noindent A large quantum computer would break the elliptic-curve key exchange used by TLS today. This project
-compares four post-quantum key-encapsulation mechanisms (KEMs): ML-KEM, HQC, FrodoKEM and Classic McEliece,
-each at three security levels. This midterm report covers the first part of the project: \textbf{E4}, which
-checks that the implementations are correct, and \textbf{E1}, which measures their speed, size and memory on an
-Apple M4 and an Intel i7. All 69 correctness checks pass on both computers. ML-KEM is faster than today's
-X25519 but sends about 35 times more bytes; the more cautious methods are 19 to several thousand times slower.
-\end{abstract}
 
 \section{Introduction}
 Data encrypted today can be recorded and decrypted later, once a large quantum computer exists. NIST has
@@ -175,8 +166,8 @@ results as the portable code, so comparing their speed is fair, and liboqs agree
 vectors and with OpenSSL's independent ML-KEM.
 
 \subsection{E1: performance}
-\begin{table}[H]
-\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
+\begin{table}[t]
+\centering\scriptsize\setlength{\tabcolsep}{3.6pt}
 \input{tab_e1.tex}
 \caption{One whole key exchange (KeyGen + Encaps + Decaps), median. Portable = portable C; (\emph{n}×) after an optimised time = how many times faster it is than
 portable C; -- = no optimised code. ``vs X25519'' compares with X25519 DH on the same computer, using the
@@ -184,18 +175,8 @@ faster version: below 1.00× means faster than X25519.}
 \label{tab:e1}
 \end{table}
 
-\textbf{Each step separately.} Table~\ref{tab:ops} splits the exchange into its three steps, for both code
-versions. It shows where the time goes: for ML-KEM and HQC, Decaps is the slowest step (it decrypts and then
-re-encrypts to check the ciphertext); for FrodoKEM the three steps cost about the same; for Classic McEliece,
-KeyGen is by far the slowest, while Encaps takes only microseconds.
-
-\begin{table}[t]
-\centering\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.9}
-\input{tab_ops.tex}
-\caption{Median time per call for each step, portable and optimised code. -- = no optimised code. McEliece
-KeyGen is the median of 100 runs.}
-\label{tab:ops}
-\end{table}
+Table~\ref{tab:e1} gives one whole key exchange for every method. \textbf{Note:} the time of each step
+separately (KeyGen, Encaps, Decaps, both code versions) was also measured and tabulated; it is in the project repository.
 
 \textbf{Main findings:}
 \begin{itemize}
