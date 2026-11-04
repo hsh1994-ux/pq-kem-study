@@ -1,16 +1,16 @@
 % Midterm report: E1 (performance) and E4 (correctness).
 % Build after analysis/part1_figures.py: cd report/midterm && latexmk -pdf midterm.tex
 \documentclass[10pt,a4paper]{article}
-\usepackage[margin=2.2cm]{geometry}
+\usepackage[margin=2.1cm,vmargin=1.6cm]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage{microtype,booktabs,enumitem,array,tabularx,float,caption}
 \usepackage[hidelinks]{hyperref}
 \usepackage[compact]{titlesec}
 \titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
-\setlist{leftmargin=1.5em,itemsep=2pt,topsep=4pt}
+\setlist{leftmargin=1.5em,itemsep=1pt,topsep=3pt}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{6pt}
+\setlength{\parskip}{5pt}
 \captionsetup{font=small,labelfont=bf,labelsep=period,skip=4pt}
 \setlength{\textfloatsep}{12pt}
 \setlength{\intextsep}{10pt}
@@ -184,6 +184,19 @@ faster version: below 1.00× means faster than X25519.}
 \label{tab:e1}
 \end{table}
 
+\textbf{Each step separately.} Table~\ref{tab:ops} splits the exchange into its three steps, for both code
+versions. It shows where the time goes: for ML-KEM and HQC, Decaps is the slowest step (it decrypts and then
+re-encrypts to check the ciphertext); for FrodoKEM the three steps cost about the same; for Classic McEliece,
+KeyGen is by far the slowest, while Encaps takes only microseconds.
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.9}
+\input{tab_ops.tex}
+\caption{Median time per call for each step, portable and optimised code. -- = no optimised code. McEliece
+KeyGen is the median of 100 runs.}
+\label{tab:ops}
+\end{table}
+
 \textbf{Main findings:}
 \begin{itemize}
   \item \textbf{ML-KEM is faster than today's X25519} at every level: ML-KEM-768 needs 0.45× (M4) and 0.29×
@@ -210,17 +223,14 @@ McEliece-348864 key generation takes 2.6× the published cycle count, which is s
 liboqs has no optimised HQC code, so HQC's gap to ML-KEM is partly an implementation gap.
 
 \section{Remaining work}
-\begin{itemize}
-  \item \textbf{E2:} real TLS 1.3 handshakes with each KEM, also under network delay and packet loss.
-  \item \textbf{E3:} tests for secret-dependent timing (dudect, Valgrind, KyberSlash-style division checks).
-  \item Final report and demo at the mini-conference.
-\end{itemize}
+\textbf{E2}: real TLS 1.3 handshakes with each KEM, also under network delay and packet loss.
+\textbf{E3}: tests for secret-dependent timing (dudect, Valgrind, KyberSlash-style division checks).
+Then the final report and the demo at the mini-conference.
 
-{\small\textbf{Tools.} Code, analysis scripts and this report were prepared with help from Claude
-(Anthropic); the design, measurements and interpretation are the author's.\par}
+
 
 \section*{References}
-\small
+\footnotesize
 \begin{enumerate}[label={[\arabic*]},leftmargin=2em,itemsep=0pt]
   \item NIST, \emph{FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard}, 2024.
   \item NIST, \emph{IR 8545: Status Report on the Fourth Round of the NIST PQC Standardization Process}, 2025.

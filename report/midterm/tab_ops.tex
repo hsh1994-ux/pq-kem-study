@@ -1,0 +1,38 @@
+\begin{tabular}{llrrrrrr}
+\toprule
+ & & \multicolumn{3}{c}{\textbf{Apple M4}} & \multicolumn{3}{c}{\textbf{Intel i7}} \\ \cmidrule(lr){3-5}\cmidrule(lr){6-8}
+Method & Code & KeyGen & Encaps & Decaps & KeyGen & Encaps & Decaps \\
+\midrule
+X25519 DH (today) & OpenSSL & 13.2\,µs & 31.2\,µs & 18.0\,µs & 27.4\,µs & 57.4\,µs & 29.9\,µs \\
+X25519 KEM (DHKEM) & OpenSSL & 15.0\,µs & 38.0\,µs & 18.5\,µs & 26.5\,µs & 58.2\,µs & 41.2\,µs \\
+Hybrid X25519MLKEM768 & OpenSSL & 30.1\,µs & 38.9\,µs & 31.0\,µs & 59.1\,µs & 73.7\,µs & 57.7\,µs \\
+\midrule
+ML-KEM-512 & portable & 8.54\,µs & 8.33\,µs & 9.96\,µs & 18.5\,µs & 20.7\,µs & 25.1\,µs \\
+ & optimised & 5.21\,µs & 5.67\,µs & 6.71\,µs & 5.85\,µs & 6.52\,µs & 8.46\,µs \\
+ML-KEM-768 & portable & 14.5\,µs & 13.0\,µs & 15.2\,µs & 30.6\,µs & 30.9\,µs & 37.1\,µs \\
+ & optimised & 8.50\,µs & 8.96\,µs & 10.5\,µs & 9.60\,µs & 10.3\,µs & 13.2\,µs \\
+ML-KEM-1024 & portable & 22.4\,µs & 19.7\,µs & 22.5\,µs & 46.1\,µs & 44.7\,µs & 52.6\,µs \\
+ & optimised & 12.8\,µs & 13.7\,µs & 15.9\,µs & 13.3\,µs & 14.6\,µs & 18.6\,µs \\
+\midrule
+HQC-1 & portable & 561\,µs & 1.12\,ms & 1.71\,ms & 1.22\,ms & 2.45\,ms & 3.73\,ms \\
+ & optimised & – & – & – & – & – & – \\
+HQC-3 & portable & 1.69\,ms & 3.36\,ms & 5.09\,ms & 3.72\,ms & 7.41\,ms & 11.2\,ms \\
+ & optimised & – & – & – & – & – & – \\
+HQC-5 & portable & 3.68\,ms & 7.44\,ms & 11.2\,ms & 8.79\,ms & 17.5\,ms & 26.5\,ms \\
+ & optimised & – & – & – & – & – & – \\
+\midrule
+Frodo-640 & portable & 862\,µs & 923\,µs & 917\,µs & 2.01\,ms & 2.16\,ms & 2.15\,ms \\
+ & optimised & – & – & – & 681\,µs & 785\,µs & 767\,µs \\
+Frodo-976 & portable & 1.93\,ms & 2.09\,ms & 2.07\,ms & 4.45\,ms & 4.77\,ms & 4.73\,ms \\
+ & optimised & – & – & – & 1.44\,ms & 1.60\,ms & 1.56\,ms \\
+Frodo-1344 & portable & 3.49\,ms & 3.81\,ms & 3.72\,ms & 8.06\,ms & 8.65\,ms & 8.59\,ms \\
+ & optimised & – & – & – & 2.58\,ms & 2.59\,ms & 2.41\,ms \\
+\midrule
+McEliece-348864 & portable & 51.8\,ms & 32.5\,µs & 13.6\,ms & 71.4\,ms & 46.8\,µs & 18.6\,ms \\
+ & optimised & – & – & – & 38.6\,ms & 13.0\,µs & 36.5\,µs \\
+McEliece-460896 & portable & 134\,ms & 66.2\,µs & 24.6\,ms & 234\,ms & 90.5\,µs & 41.9\,ms \\
+ & optimised & – & – & – & 113\,ms & 29.3\,µs & 73.1\,µs \\
+McEliece-6688128 & portable & 413\,ms & 121\,µs & 47.6\,ms & 496\,ms & 153\,µs & 95.6\,ms \\
+ & optimised & – & – & – & 134\,ms & 39.4\,µs & 68.0\,µs \\
+\bottomrule
+\end{tabular}
