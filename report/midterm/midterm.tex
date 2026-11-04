@@ -54,10 +54,37 @@ A KEM lets two parties agree on a shared secret in three steps:
   \item \textbf{Decaps}: the client unlocks it with its private key. Both sides now hold the same secret.
 \end{enumerate}
 
-\subsection{The four methods}
-Post-quantum KEMs rest on two main kinds of hard problems, lattices and error-correcting codes. Each comes in a
-\emph{structured} form (fast and compact, but with extra structure an attacker could exploit) and an
-\emph{unstructured} form (slower and larger, but considered safer). One method of each kind was chosen:
+\subsection{The four methods: structured and unstructured}
+Post-quantum KEMs rest on two main kinds of hard maths problems:
+\begin{itemize}
+  \item \textbf{Lattices:} the public key hides a secret behind a large system of linear equations with small
+  random errors added (the \emph{Learning With Errors} problem). Without the secret, removing the errors is
+  believed to be hard, even for a quantum computer.
+  \item \textbf{Error-correcting codes:} the public key is a disguised version of a code that the owner can
+  decode efficiently. The ciphertext is a message with deliberate errors added; without the secret
+  disguise, correcting those errors is believed to be hard. This idea goes back to McEliece in 1978.
+\end{itemize}
+
+Both problems need a large matrix as the public key. The difference between the methods is \textbf{how that
+matrix is built}:
+\begin{itemize}
+  \item \textbf{Structured:} the matrix follows a repeating pattern, so it can be described by a few short
+  rows instead of being stored in full. In ML-KEM the matrix entries are polynomials, and one polynomial
+  stands for a whole block of the matrix; in HQC every row is a cyclic shift of the first row. This makes
+  keys \textbf{much smaller} and the arithmetic \textbf{much faster}. The price is that the pattern is
+  extra information an attacker could try to use. No practical attack that does so is known today, but the
+  security rests on a slightly stronger assumption.
+  \item \textbf{Unstructured:} the matrix is random, with no pattern, and is stored or generated in full.
+  FrodoKEM uses plain Learning With Errors on a large random matrix; Classic McEliece uses binary Goppa codes
+  hidden behind a random-looking matrix, a design that has resisted attacks for over 45 years. Keys are
+  \textbf{much larger} and the work is \textbf{slower}, but the security depends only on the basic hard
+  problem, with no pattern to exploit. This is why they are seen as the \emph{cautious} choice.
+\end{itemize}
+
+Choosing one method of each kind lets the study answer two questions at once: how lattices compare with codes,
+and \textbf{what the extra caution of unstructured designs costs}. Our own measurements (Section~4) show the
+size of this cost: at level 3, ML-KEM sends 2,272 bytes and FrodoKEM 31,424 bytes (14× more); HQC sends 13,492
+bytes and Classic McEliece 524,316 bytes (39× more, almost all of it the public key).
 
 \begin{table}[H]
 \centering\small
@@ -71,7 +98,7 @@ FrodoKEM & lattices & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommended b
 Classic McEliece & codes & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommended by BSI [4,5] \\
 \bottomrule
 \end{tabular}
-\caption{The four KEMs. Each is tested at NIST security levels 1, 3 and 5 (as strong as AES-128, -192 and
+\caption{The four KEMs, one of each kind. Each is tested at NIST security levels 1, 3 and 5 (as strong as AES-128, -192 and
 -256), so 12 versions in total.}
 \end{table}
 
