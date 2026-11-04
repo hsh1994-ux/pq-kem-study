@@ -1,0 +1,209 @@
+% Midterm report: E1 (performance) and E4 (correctness).
+% Build after analysis/part1_figures.py: cd report/midterm && latexmk -pdf midterm.tex
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype,booktabs,enumitem,array,tabularx,float,caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage[compact]{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\setlist{leftmargin=1.5em,itemsep=2pt,topsep=4pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\captionsetup{font=small,labelfont=bf,labelsep=period,skip=4pt}
+\setlength{\textfloatsep}{12pt}
+\setlength{\intextsep}{10pt}
+\DeclareUnicodeCharacter{00D7}{\ensuremath{\times}}
+\DeclareUnicodeCharacter{00B5}{\ensuremath{\mu}}
+\hypersetup{pdftitle={Midterm Report: Post-Quantum KEM Comparative Study},pdfauthor={Hamdan Al-Jabri}}
+
+\begin{document}
+
+{\raggedright\LARGE\bfseries Midterm Report: Comparative Study of Post-Quantum Key-Exchange Mechanisms\par}
+\vspace{6pt}
+Hamdan Al-Jabri (Neptun QUTC51)\\
+Cybersecurity Lab 1, ELTE Faculty of Informatics\\
+November 2026
+
+\begin{abstract}
+\noindent A large quantum computer would break the elliptic-curve key exchange used by TLS today. This project
+compares four post-quantum key-encapsulation mechanisms (KEMs): ML-KEM, HQC, FrodoKEM and Classic McEliece,
+each at three security levels. This midterm report covers the first part of the project: \textbf{E4}, which
+checks that the implementations are correct, and \textbf{E1}, which measures their speed, size and memory on an
+Apple M4 and an Intel i7. All 69 correctness checks pass on both computers. ML-KEM is faster than today's
+X25519 but sends about 35 times more bytes; the more cautious methods are 19 to several thousand times slower.
+\end{abstract}
+
+\section{Introduction}
+Data encrypted today can be recorded and decrypted later, once a large quantum computer exists. NIST has
+therefore standardised ML-KEM (FIPS 203, 2024) and selected HQC as a backup (2025), and browsers already use
+the hybrid X25519MLKEM768. The available post-quantum KEMs, however, differ by orders of magnitude in speed and
+size, and their implementations differ in quality.
+
+The project compares them in four experiments: \textbf{E1} performance, \textbf{E2} real TLS 1.3 handshakes,
+\textbf{E3} timing leaks, and \textbf{E4} correctness. This report covers E4 and E1. Code and data are public
+at \url{https://github.com/hsh1994-ux/pq-kem-study}.
+
+\section{Background}
+\subsection{Key-encapsulation mechanisms}
+A KEM lets two parties agree on a shared secret in three steps:
+\begin{enumerate}
+  \item \textbf{KeyGen}: the client makes a key pair and sends the public key.
+  \item \textbf{Encaps}: the server makes a random secret, locks it with the public key and sends it back (the ciphertext).
+  \item \textbf{Decaps}: the client unlocks it with its private key. Both sides now hold the same secret.
+\end{enumerate}
+
+\subsection{The four methods}
+Post-quantum KEMs rest on two main kinds of hard problems, lattices and error-correcting codes. Each comes in a
+\emph{structured} form (fast and compact, but with extra structure an attacker could exploit) and an
+\emph{unstructured} form (slower and larger, but considered safer). One method of each kind was chosen:
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Method & Based on & Design & Status \\
+\midrule
+ML-KEM & lattices & structured & NIST standard, FIPS 203 (2024) [1] \\
+HQC & codes & structured & selected by NIST as backup (2025) [2] \\
+FrodoKEM & lattices & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommended by BSI [3,5] \\
+Classic McEliece & codes & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommended by BSI [4,5] \\
+\bottomrule
+\end{tabular}
+\caption{The four KEMs. Each is tested at NIST security levels 1, 3 and 5 (as strong as AES-128, -192 and
+-256), so 12 versions in total.}
+\end{table}
+
+\subsection{Baselines}
+\begin{itemize}
+  \item \textbf{X25519 DH} [6]: plain Diffie--Hellman, as used in TLS today. It is not a KEM, but it has the same
+  three steps: the client makes a key pair (KeyGen); the server makes its own key pair and computes the secret
+  (Encaps); the client computes the same secret (Decaps). This is the main baseline.
+  \item \textbf{X25519 KEM} (DHKEM, RFC 9180 [7]): the same calculation inside the KEM interface, plus one step
+  that hashes the result with both public keys. Measured for comparison.
+  \item \textbf{Hybrid X25519MLKEM768} [8]: used by browsers today. It is packaged as one KEM, but inside it is
+  plain X25519 DH plus ML-KEM-768; the two secrets are joined and TLS hashes them later. It stays safe if
+  either part is broken.
+\end{itemize}
+
+\section{Method}
+\subsection{Setup}
+Two computers were used: an \textbf{Apple M4} MacBook Air (ARM64, Linux in Docker) and an \textbf{Intel
+i7-1185G7} laptop (x86-64, Linux in WSL2). Both run the same software: liboqs 0.16.0 [9] for the
+post-quantum KEMs and OpenSSL 3.5.8 for X25519, the hybrid and a second ML-KEM implementation. Only the
+processor differs.
+
+liboqs was built in two versions: \textbf{portable C}, which runs on any processor, and \textbf{optimised}
+code, which uses vector instructions (AVX2 on Intel, NEON on the M4). Optimised code does not exist for every
+method on every processor:
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+Method & Intel (AVX2) & Apple M4 (NEON) \\
+\midrule
+ML-KEM & yes & yes \\
+HQC & no & no \\
+FrodoKEM & yes & no \\
+Classic McEliece & yes & no \\
+\bottomrule
+\end{tabular}
+\caption{Optimised code in liboqs 0.16.0. Where there is none, only the portable code is used.}
+\end{table}
+
+\subsection{E4: correctness}
+Before measuring speed, five kinds of checks were run on both computers:
+\begin{enumerate}
+  \item \textbf{Known answers:} the code gives exactly the expected output for fixed inputs (all 12, both versions).
+  \item \textbf{NIST test vectors:} ML-KEM matches NIST's official FIPS 203 test vectors (ML-KEM only, the
+  other methods have no NIST standard yet).
+  \item \textbf{Random exchanges:} with random inputs both sides always get the same secret (all 12, both versions).
+  \item \textbf{Cross-version:} keys made by the portable code work with the optimised code, and the other way
+  round (all 12).
+  \item \textbf{Cross-library:} liboqs and OpenSSL ML-KEM work together (ML-KEM only, OpenSSL does not
+  implement the other three).
+\end{enumerate}
+
+\subsection{E1: performance}
+\begin{itemize}
+  \item \textbf{Timing:} KeyGen, Encaps and Decaps were each run \textbf{1,000 times} and the median is
+  reported. One whole key exchange = KeyGen + Encaps + Decaps.
+  \item \textbf{Classic McEliece key generation was run 100 times, not 1,000.} One run takes 40--500\,ms, so
+  1,000 runs would take hours. Its time also varies a lot, because it builds a random key and starts again
+  when that fails (about 7 times in 10); 20 runs gave an unstable median, 100 runs give a stable one.
+  \item \textbf{Fair conditions:} the timer was calibrated at the start of every run, the processor was warmed
+  up for 200\,ms before timing (the M4 needs about 90\,ms to reach full speed), and there was a 30-second
+  pause between methods so the fanless MacBook could cool down. The processor's clock speed was also measured,
+  so results can be given in CPU cycles and compared with published numbers.
+  \item \textbf{Also recorded:} bytes sent over the network and peak memory (stack) of each step.
+  \item \textbf{Comparisons} with X25519 always use the faster of the two code versions.
+\end{itemize}
+
+\section{Results}
+\subsection{E4: correctness}
+All \textbf{69 checks (1,332 test cases) pass on both computers}. The optimised code gives exactly the same
+results as the portable code, so comparing their speed is fair, and liboqs agrees with NIST's official
+vectors and with OpenSSL's independent ML-KEM.
+
+\subsection{E1: performance}
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
+\input{tab_e1.tex}
+\caption{One whole key exchange (KeyGen + Encaps + Decaps), median. Portable = portable C; (\emph{n}×) after an optimised time = how many times faster it is than
+portable C; -- = no optimised code. ``vs X25519'' compares with X25519 DH on the same computer, using the
+faster version: below 1.00× means faster than X25519.}
+\label{tab:e1}
+\end{table}
+
+\textbf{Main findings:}
+\begin{itemize}
+  \item \textbf{ML-KEM is faster than today's X25519} at every level: ML-KEM-768 needs 0.45× (M4) and 0.29×
+  (Intel) of the X25519 time. Its cost is size: 2,272 bytes instead of 64 (35×), still small enough for one
+  TLS message.
+  \item \textbf{The hybrid costs 1.6--1.7× X25519}, about X25519 plus ML-KEM added together.
+  The KEM form of X25519 is 10--14\% slower than plain DH.
+  \item \textbf{The cautious methods are much more expensive in both time and size.} At level 1: HQC 54--65×
+  X25519, FrodoKEM 19--43×, Classic McEliece 337--1,047×. McEliece's public key (0.26--1\,MB) is too large for
+  a TLS key share, and it needs up to 1.5\,MiB of stack, against 10--21\,KiB for ML-KEM.
+  \item \textbf{Optimised code matters as much as the method.} On Intel it makes ML-KEM and FrodoKEM about
+  3× faster and McEliece Decaps 510--1,400× faster. On the M4 only ML-KEM has optimised code (1.5×). As a
+  result the M4, which is about 2.2× faster on portable code, is slower than the older Intel chip for FrodoKEM
+  and McEliece.
+  \item \textbf{Agreement with published results:} measured in CPU cycles, HQC and McEliece Encaps/Decaps agree
+  with the designers' numbers within 7--20\%; ML-KEM and FrodoKEM are faster than older published figures
+  because liboqs uses newer code.
+\end{itemize}
+
+\section{Limitations}
+Both computers run Linux in a virtual machine (Docker, WSL2), and there is one computer per architecture.
+Classic McEliece key generation varies strongly from run to run because of its random retries, and
+McEliece-348864 key generation takes 2.6× the published cycle count, which is still being investigated.
+liboqs has no optimised HQC code, so HQC's gap to ML-KEM is partly an implementation gap.
+
+\section{Remaining work}
+\begin{itemize}
+  \item \textbf{E2:} real TLS 1.3 handshakes with each KEM, also under network delay and packet loss.
+  \item \textbf{E3:} tests for secret-dependent timing (dudect, Valgrind, KyberSlash-style division checks).
+  \item Final report and demo at the mini-conference.
+\end{itemize}
+
+{\small\textbf{Tools.} Code, analysis scripts and this report were prepared with help from Claude
+(Anthropic); the design, measurements and interpretation are the author's.\par}
+
+\section*{References}
+\small
+\begin{enumerate}[label={[\arabic*]},leftmargin=2em,itemsep=0pt]
+  \item NIST, \emph{FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard}, 2024.
+  \item NIST, \emph{IR 8545: Status Report on the Fourth Round of the NIST PQC Standardization Process}, 2025.
+  \item E.~Alkim et al., \emph{FrodoKEM specification}; ISO/IEC 18033-2:2006/Amd 2:2026.
+  \item D.~J.~Bernstein et al., \emph{Classic McEliece: conservative code-based cryptography}; ISO/IEC 18033-2:2006/Amd 2:2026.
+  \item BSI, \emph{TR-02102-1: Cryptographic Mechanisms: Recommendations and Key Lengths}.
+  \item A.~Langley, M.~Hamburg, S.~Turner, \emph{RFC 7748: Elliptic Curves for Security}, 2016.
+  \item R.~Barnes et al., \emph{RFC 9180: Hybrid Public Key Encryption}, 2022.
+  \item K.~Kwiatkowski et al., \emph{Post-quantum hybrid ECDHE-MLKEM key agreement for TLSv1.3}, IETF draft-ietf-tls-ecdhe-mlkem.
+  \item Open Quantum Safe, \emph{liboqs 0.16.0}, \url{https://openquantumsafe.org}.
+\end{enumerate}
+
+\end{document}
