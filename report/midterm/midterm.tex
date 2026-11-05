@@ -1,16 +1,16 @@
 % Midterm report: E1 (performance) and E4 (correctness).
 % Build after analysis/part1_figures.py: cd report/midterm && latexmk -pdf midterm.tex
 \documentclass[11pt,a4paper]{article}
-\usepackage[margin=2.2cm,vmargin=1.7cm]{geometry}
+\usepackage[margin=2.1cm,vmargin=1.6cm]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage{microtype,booktabs,enumitem,array,tabularx,float,caption}
 \usepackage[hidelinks]{hyperref}
 \usepackage[compact]{titlesec}
 \titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
-\setlist{leftmargin=1.5em,itemsep=3pt,topsep=3pt}
+\setlist{leftmargin=1.5em,itemsep=2pt,topsep=3pt}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{7pt}
+\setlength{\parskip}{6pt}
 \captionsetup{font=small,labelfont=bf,labelsep=period,skip=4pt}
 \setlength{\textfloatsep}{16pt}
 \setlength{\intextsep}{14pt}
@@ -41,8 +41,9 @@ at \url{https://github.com/hsh1994-ux/pq-kem-study}.
 A KEM lets two parties agree on a shared secret in three steps:
 \begin{enumerate}
   \item \textbf{KeyGen}: the client makes a key pair and sends the public key.
-  \item \textbf{Encaps}: the server makes a random secret, locks it with the public key and sends it back (the ciphertext).
-  \item \textbf{Decaps}: the client unlocks it with its private key. Both sides now hold the same secret.
+  \item \textbf{Encaps}: the server uses the public key to create a random shared secret and a ciphertext, and
+  sends the ciphertext back.
+  \item \textbf{Decaps}: the client uses its private key to recover the same secret from the ciphertext.
 \end{enumerate}
 
 \subsection{The four methods: structured and unstructured}
@@ -50,7 +51,8 @@ Post-quantum KEMs rest on two main kinds of hard maths problems:
 \begin{itemize}
   \item \textbf{Lattices:} the public key hides a secret behind a large system of linear equations with small
   random errors added (the \emph{Learning With Errors} problem). Without the secret, removing the errors is
-  believed to be hard, even for a quantum computer.
+  believed to be hard, even for a quantum computer. ML-KEM uses \emph{Module}-LWE, where the equations are
+  built from polynomials; FrodoKEM uses plain LWE.
   \item \textbf{Error-correcting codes:} the public key is a disguised version of a code that the owner can
   decode efficiently. The ciphertext is a message with deliberate errors added; without the secret
   disguise, correcting those errors is believed to be hard. This idea goes back to McEliece in 1978.
@@ -61,21 +63,23 @@ matrix is built}:
 \begin{itemize}
   \item \textbf{Structured:} the matrix follows a repeating pattern, so it can be described by a few short
   rows instead of being stored in full. In ML-KEM the matrix entries are polynomials, and one polynomial
-  stands for a whole block of the matrix; in HQC every row is a cyclic shift of the first row. This makes
-  keys \textbf{much smaller} and the arithmetic \textbf{much faster}. The price is that the pattern is
-  extra information an attacker could try to use. No practical attack that does so is known today, but the
-  security rests on a slightly stronger assumption.
-  \item \textbf{Unstructured:} the matrix is random, with no pattern, and is stored or generated in full.
-  FrodoKEM uses plain Learning With Errors on a large random matrix; Classic McEliece uses binary Goppa codes
-  hidden behind a random-looking matrix, a design that has resisted attacks for over 45 years. Keys are
-  \textbf{much larger} and the work is \textbf{slower}, but the security depends only on the basic hard
-  problem, with no pattern to exploit. This is why they are seen as the \emph{cautious} choice.
+  stands for a whole block of the matrix; in HQC the matrix is built from circulant blocks, where each row of
+  a block is a cyclic shift of the row before it. This makes keys \textbf{much smaller} and the arithmetic
+  \textbf{much faster}. The price is extra algebraic structure, which adds assumptions to the security
+  argument and needs its own cryptanalysis. No practical attack that uses it is known today.
+  \item \textbf{Unstructured:} the public key has no repeating pattern and is stored or generated in full.
+  FrodoKEM uses plain LWE on a large random matrix. Classic McEliece hides a binary Goppa code behind a
+  random-looking matrix; the Goppa code itself has algebraic structure (it is the secret trapdoor), but the
+  public key shows no pattern, and the design has resisted attacks for over 45 years. Keys are \textbf{much
+  larger} and the work is \textbf{slower}, but these designs avoid the extra assumptions of structured ones,
+  which is why they are seen as the more \emph{conservative} choice. Neither kind is automatically more secure.
 \end{itemize}
 
 Choosing one method of each kind lets the study answer two questions at once: how lattices compare with codes,
 and \textbf{what the extra caution of unstructured designs costs}. Our own measurements (Section~4) show the
 size of this cost: at level 3, ML-KEM sends 2,272 bytes and FrodoKEM 31,424 bytes (14× more); HQC sends 13,492
-bytes and Classic McEliece 524,316 bytes (39× more, almost all of it the public key).
+bytes and Classic McEliece 524,316 bytes (39× more, almost all of it the public key). Structure is not the
+only difference, however: the methods also differ in parameters, arithmetic and how well optimised their code is.
 
 \begin{table}[H]
 \centering\small
@@ -84,7 +88,7 @@ bytes and Classic McEliece 524,316 bytes (39× more, almost all of it the public
 Method & Based on & Design & Status \\
 \midrule
 ML-KEM & lattices & structured & NIST standard, FIPS 203 (2024) [1] \\
-HQC & codes & structured & selected by NIST as backup (2025) [2] \\
+HQC & codes & structured & NIST backup (2025); standard due 2027 [2] \\
 FrodoKEM & lattices & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommended by BSI [3,5] \\
 Classic McEliece & codes & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommended by BSI [4,5] \\
 \bottomrule
@@ -100,7 +104,8 @@ Classic McEliece & codes & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommen
   (Encaps); the client computes the same secret (Decaps). This is the main baseline.
   \item \textbf{X25519 KEM} (DHKEM, RFC 9180 [7]): the same calculation inside the KEM interface, plus one step
   that hashes the result with both public keys. Measured for comparison.
-  \item \textbf{Hybrid X25519MLKEM768} [8]: used by browsers today. It is packaged as one KEM, but inside it is
+  \item \textbf{Hybrid X25519MLKEM768} [8]: a TLS 1.3 key-exchange group, standardised in RFC 10024 (2026) and
+  used by browsers today. It is packaged as one KEM, but inside it is
   plain X25519 DH plus ML-KEM-768; the two secrets are joined and TLS hashes them later. It stays safe if
   either part is broken.
 \end{itemize}
@@ -109,8 +114,9 @@ Classic McEliece & codes & unstructured & ISO/IEC 18033-2 Amd 2 (2026); recommen
 \subsection{Setup}
 Two computers were used: an \textbf{Apple M4} MacBook Air (ARM64, Linux in Docker) and an \textbf{Intel
 i7-1185G7} laptop (x86-64, Linux in WSL2). Both run the same software: liboqs 0.16.0 [9] for the
-post-quantum KEMs and OpenSSL 3.5.8 for X25519, the hybrid and a second ML-KEM implementation. Only the
-processor differs.
+post-quantum KEMs and OpenSSL 3.5.8 for X25519, the hybrid and a second ML-KEM implementation. Both use the
+same Linux system (Ubuntu 24.04), compiler (GCC 13.3), build flags and benchmark settings. Besides the
+processor, the host operating system (macOS, Windows) and the virtualisation (Docker, WSL2) also differ.
 
 liboqs was built in two versions: \textbf{portable C}, which runs on any processor, and \textbf{optimised}
 code, which uses vector instructions (AVX2 on Intel, NEON on the M4). Optimised code does not exist for every
@@ -220,7 +226,7 @@ Then the final report and the demo at the mini-conference.
   \item BSI, \emph{TR-02102-1: Cryptographic Mechanisms: Recommendations and Key Lengths}.
   \item A.~Langley, M.~Hamburg, S.~Turner, \emph{RFC 7748: Elliptic Curves for Security}, 2016.
   \item R.~Barnes et al., \emph{RFC 9180: Hybrid Public Key Encryption}, 2022.
-  \item K.~Kwiatkowski et al., \emph{Post-quantum hybrid ECDHE-MLKEM key agreement for TLSv1.3}, IETF draft-ietf-tls-ecdhe-mlkem.
+  \item K.~Kwiatkowski et al., \emph{RFC 10024: Post-quantum hybrid ECDHE-MLKEM key agreement for TLSv1.3}, 2026.
   \item Open Quantum Safe, \emph{liboqs 0.16.0}, \url{https://openquantumsafe.org}.
 \end{enumerate}
 
