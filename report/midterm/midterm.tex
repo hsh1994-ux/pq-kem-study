@@ -153,14 +153,15 @@ Before measuring speed, five kinds of checks were run on both computers:
 \subsection{E1: performance}
 \begin{itemize}
   \item \textbf{Timing:} KeyGen, Encaps and Decaps were each run \textbf{1,000 times} and the median is
-  reported. One whole key exchange = KeyGen + Encaps + Decaps.
+  reported. One whole key exchange = the sum of the three medians (KeyGen + Encaps + Decaps).
   \item \textbf{Classic McEliece key generation was run 100 times, not 1,000.} One run takes 40--500\,ms, so
   1,000 runs would take hours. Its time also varies a lot, because it builds a random key and starts again
-  when that fails (about 7 times in 10); 20 runs gave an unstable median, 100 runs give a stable one.
+  when that fails (about 7 times in 10); 100 runs give a much more stable median than 20, but its KeyGen median can still differ by up to 1.7× between runs.
   \item \textbf{Fair conditions:} the timer was calibrated at the start of every run, the processor was warmed
   up for 200\,ms before timing (the M4 needs about 90\,ms to reach full speed), and there was a 30-second
   pause between methods so the fanless MacBook could cool down. The processor's clock speed was also measured,
-  so results can be given in CPU cycles and compared with published numbers.
+  so results can also be given as \emph{estimated} CPU cycles (time × measured clock speed) and compared with
+  published numbers.
   \item \textbf{Also recorded:} bytes sent over the network and peak memory (stack) of each step.
   \item \textbf{Comparisons} with X25519 always use the faster of the two code versions.
 \end{itemize}
@@ -175,7 +176,7 @@ vectors and with OpenSSL's independent ML-KEM.
 \begin{table}[t]
 \centering\scriptsize\setlength{\tabcolsep}{3.6pt}
 \input{tab_e1.tex}
-\caption{One whole key exchange (KeyGen + Encaps + Decaps), median. Portable = portable C; (\emph{n}×) after an optimised time = how many times faster it is than
+\caption{One whole key exchange: sum of the KeyGen, Encaps and Decaps medians. Portable = portable C; (\emph{n}×) after an optimised time = how many times faster it is than
 portable C; -- = no optimised code. ``vs X25519'' compares with X25519 DH on the same computer, using the
 faster version: below 1.00× means faster than X25519.}
 \label{tab:e1}
@@ -198,19 +199,21 @@ separately (KeyGen, Encaps, Decaps, both code versions) was also measured and ta
   3× faster and McEliece Decaps 510--1,400× faster. On the M4 only ML-KEM has optimised code (1.5×). As a
   result the M4, which is about 2.2× faster on portable code, is slower than the older Intel chip for FrodoKEM
   and McEliece.
-  \item \textbf{Agreement with published results:} measured in CPU cycles, HQC and McEliece Encaps/Decaps agree
+  \item \textbf{Agreement with published results:} in estimated CPU cycles, HQC and McEliece Encaps/Decaps agree
   with the designers' numbers within 7--20\%; ML-KEM and FrodoKEM are faster than older published figures
   because liboqs uses newer code.
 \end{itemize}
 
 \section{Limitations}
 Both computers run Linux in a virtual machine (Docker, WSL2), and there is one computer per architecture.
-Classic McEliece key generation varies strongly from run to run because of its random retries, and
+Classic McEliece key generation varies strongly from run to run because of its random retries (up to 1.7×
+between runs of the same code), and
 McEliece-348864 key generation takes 2.6× the published cycle count, which is still being investigated.
 liboqs has no optimised HQC code, so HQC's gap to ML-KEM is partly an implementation gap.
 
 \section{Remaining work}
-\textbf{E2}: real TLS 1.3 handshakes with each KEM, also under network delay and packet loss.
+\textbf{E2}: real TLS 1.3 handshakes, also under network delay and packet loss, with every KEM that fits in a
+TLS key share; Classic McEliece cannot be used, because its public key exceeds the 65,535-byte limit.
 \textbf{E3}: tests for secret-dependent timing (dudect, Valgrind, KyberSlash-style division checks).
 Then the final report and the demo at the mini-conference.
 
