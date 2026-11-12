@@ -11,6 +11,7 @@
 # oqs_provider=0.12.0-rc2
 # repo_commit=124a4d6
 # dudect_seconds=60.0
+# botan_added_1=date 2026-11-12T13:11:48Z; botan 3.14.1; repo_commit a5907ce; rows 6; original run 2026-10-11T15:34:22Z
 tier,target,op,timer,measurements,max_t,verdict,seconds,tau,opt_level,replicate_max_t
 control,planted-leaky-memcmp,compare,cntvct_ticks,14967,478.96,leak,0.1,3.9150,O2,
 control,planted-ct-memcmp,compare,cntvct_ticks,1502142,10.08,leak,19.6,0.0082,O2,
@@ -44,3 +45,9 @@ kyber-ref,Kyber768-fixed-O2,decaps,cntvct_ticks,291377,10.24,leak,12.4,0.0190,O2
 kyber-ref,Kyber768-fixed-O2,decaps-ff,cntvct_ticks,1488361,1.89,no_evidence,60.3,0.0015,O2,
 kyber-ref,Kyber768-fixed-O3,decaps,cntvct_ticks,199221,10.06,leak,7.5,0.0225,O3,10.13
 kyber-ref,Kyber768-fixed-O3,decaps-ff,cntvct_ticks,1689621,1.34,no_evidence,60.1,0.0010,O3,
+botan,ML-KEM-512,decaps,cntvct_ticks,4384909,10.02,leak,52.1,0.0048,O3,10.19
+botan,ML-KEM-512,decaps-ff,cntvct_ticks,302121,1.09,no_evidence,60.1,0.0020,O3,
+botan,ML-KEM-768,decaps,cntvct_ticks,3717509,9.06,no_evidence,60.2,0.0047,O3,
+botan,ML-KEM-1024,decaps,cntvct_ticks,2742198,2.14,no_evidence,60.1,0.0013,O3,
+botan,FrodoKEM-640-SHAKE,decaps,cntvct_ticks,89630,1.63,no_evidence,60.1,0.0054,O3,
+botan,Classic-McEliece-348864,decaps,cntvct_ticks,3560,0.53,insufficient,60.3,0.0089,O3,
