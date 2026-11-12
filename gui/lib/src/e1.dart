@@ -11,10 +11,11 @@ const e1MetricLabels = {
 };
 
 const e1Ops = ['keygen', 'encaps', 'decaps'];
-const e1Tiers = ['ref', 'opt', 'openssl'];
+const e1Tiers = ['ref', 'opt', 'botan', 'openssl'];
 const e1TierLabels = {
   'ref': 'ref (portable C)',
   'opt': 'opt (AVX2 / NEON)',
+  'botan': 'Botan 3',
   'openssl': 'OpenSSL 3.5',
 };
 
@@ -69,4 +70,4 @@ class E1Index {
 }
 
 /// Short tier label for series names.
-String tierShort(String t) => t == 'openssl' ? 'OpenSSL' : t;
+String tierShort(String t) => switch (t) { 'openssl' => 'OpenSSL', 'botan' => 'Botan', _ => t };

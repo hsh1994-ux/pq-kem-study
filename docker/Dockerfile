@@ -4,8 +4,9 @@
 #   docker build -t pq-kem-study -f docker/Dockerfile .
 #   docker run --rm -it --cap-add=NET_ADMIN -v "$PWD":/work pq-kem-study make quick
 #
-# Dependencies are built into /opt/pqbuild inside the image, so the repo you
-# mount stays small. NET_ADMIN is only needed for E2 (tc netem).
+# Dependencies (OpenSSL, liboqs, oqs-provider, Botan) are built into
+# /opt/pqbuild inside the image, so the repo you mount stays small.
+# NET_ADMIN is only needed for E2 (tc netem).
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -19,7 +20,7 @@ WORKDIR /opt/pq-kem-study
 COPY versions.env ./
 COPY scripts/build_deps.sh scripts/
 RUN BUILD_DIR=/opt/pqbuild scripts/build_deps.sh \
-    && rm -rf /opt/pqbuild/src/openssl /opt/pqbuild/oqs-provider.build
+    && rm -rf /opt/pqbuild/src/openssl /opt/pqbuild/oqs-provider.build /opt/pqbuild/botan-ct.build/build/obj
 
 ENV BUILD_DIR=/opt/pqbuild
 WORKDIR /work

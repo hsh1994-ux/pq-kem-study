@@ -6,6 +6,10 @@
 #   liboqs-opt/    liboqs, tuned for this CPU (AVX2 or NEON)      -> "opt" tier
 #   liboqs-ct/     liboqs Debug build with constant-time tests    -> E3
 #   ossl-modules/  oqs-provider (HQC, FrodoKEM, ... inside OpenSSL TLS)
+#   botan/         Botan 3, release build: library, `botan` CLI (TLS server),
+#                  botan-test (Botan's own KATs)                    -> "botan" tier
+#   botan-ct/      Botan 3 with --with-valgrind: its CT::poison annotations
+#                  become Valgrind client requests                  -> E3
 #
 # Works on x86-64 and ARM64 Linux. Safe to re-run: finished steps are skipped.
 set -euo pipefail
@@ -98,6 +102,32 @@ if [ ! -f "$B/openssl/lib/ossl-modules/oqsprovider.so" ]; then
   ninja -C "$B/oqs-provider.build" -j"$JOBS" >/dev/null
   mkdir -p "$B/openssl/lib/ossl-modules"
   cp "$B/oqs-provider.build/lib/oqsprovider.so" "$B/openssl/lib/ossl-modules/"
+fi
+
+# ---------------------------------------------------------------- Botan
+# Default module set (not --minimized-build): a minimized build silently drops
+# Botan's SIMD paths (kyber_avx2, keccak_perm_bmi2, ...), and we want the code
+# Botan users actually get. Botan picks AVX2/NEON paths at run time (CPUID).
+clone https://github.com/randombit/botan "$BOTAN_TAG" "$SRC/botan"
+
+build_botan() { # build_botan <name> <make targets> <extra configure args...>
+  local name=$1 targets=$2; shift 2
+  [ -f "$B/$name/lib/libbotan-3.a" ] && return 0
+  log "Botan $BOTAN_TAG ($name)"
+  [ -f "$B/$name.build/Makefile" ] || (cd "$SRC/botan" && python3 configure.py \
+    --prefix="$B/$name" --with-build-dir="$B/$name.build" --disable-shared-library \
+    --without-documentation --no-install-python-module "$@" >/dev/null)
+  # The generated Makefile names sources relative to Botan's source root.
+  (cd "$SRC/botan" && make -f "$B/$name.build/Makefile" -j"$JOBS" $targets >/dev/null &&
+    make -f "$B/$name.build/Makefile" install >/dev/null)
+}
+# release: library + CLI + test suite (botan-test stays in botan.build/).
+build_botan botan "libs cli tests" --build-targets=static,cli,tests
+# ct: same sources with Valgrind client requests compiled in (needs valgrind.h).
+if [ -f /usr/include/valgrind/memcheck.h ]; then
+  build_botan botan-ct "libs" --build-targets=static --with-valgrind
+else
+  log "Valgrind headers not found: skipping botan-ct (E3 Valgrind part)"
 fi
 
 # ---------------------------------------------------------------- ACVP vectors

@@ -26,6 +26,8 @@ Color tierShade(Color base, String tier) {
       return Color.lerp(base, Colors.white, 0.45)!;
     case 'openssl':
       return Color.lerp(base, Colors.black, 0.35)!;
+    case 'botan':
+      return Color.lerp(base, Colors.black, 0.18)!;
     default:
       return base;
   }

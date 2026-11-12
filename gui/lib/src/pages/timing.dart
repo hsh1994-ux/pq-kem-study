@@ -154,6 +154,7 @@ class _TimingPageState extends State<TimingPage> {
     final rows = [
       for (final r in f.rows)
         [
+          TCell(r['impl'] ?? 'liboqs'),
           TCell(r['alg'] ?? '', sort: repo.catalog.order.indexOf(r['alg'] ?? '')),
           TCell.number(numOf(r, 'contexts_raw'), groupDigits),
           TCell.number(numOf(r, 'errors_raw'), groupDigits),
@@ -168,14 +169,14 @@ class _TimingPageState extends State<TimingPage> {
     ];
     return Section(
       title: 'Valgrind · secret-dependent branches and memory accesses',
-      subtitle: 'liboqs ct build, all random bytes marked secret. "After suppressions" applies liboqs\' own '
-          'list of known, reviewed issues.',
+      subtitle: 'liboqs: ct build, all random bytes marked secret; "After suppressions" applies liboqs\' own '
+          'list of known, reviewed issues. Botan: --with-valgrind build, Botan\'s own annotations mark the secrets.',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         FileDropdown(files: files, value: f, onChanged: (v) => setState(() => _valgrind = v?.name)),
         const SizedBox(height: 8),
         SortableTable(
-          columns: const ['KEM', 'Contexts (raw)', 'Errors (raw)', 'After suppressions', 'Known upstream', 'Crashed', 'Functions'],
-          numeric: const {1, 2, 3},
+          columns: const ['Library', 'KEM', 'Contexts (raw)', 'Errors (raw)', 'After suppressions', 'Known upstream', 'Crashed', 'Functions'],
+          numeric: const {2, 3, 4},
           rows: rows,
         ),
       ]),

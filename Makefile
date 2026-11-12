@@ -17,11 +17,25 @@ OSSL_LINK = -L$(OSSL)/lib -Wl,-rpath,$(OSSL)/lib -lcrypto
 TOOLS    = $(foreach t,$(TIERS),bin/kemtool-$(t) bin/bench_kem-$(t)) bin/bench_ossl bin/hs_client \
            $(foreach t,$(TIERS),bin/dudect_kem-$(t)) bin/dudect_planted bin/calibrate
 
+# Botan 3 tools (C++20). Built only when `make deps` has built Botan, so an
+# older build directory still works for the liboqs/OpenSSL experiments.
+CXX      ?= g++
+CXXFLAGS ?= -O2 -g
+CXXFLAGS += -std=c++20 -Wall -Wextra -D_GNU_SOURCE
+BOTAN    = $(BUILD_DIR)/botan
+BOTAN_CT = $(BUILD_DIR)/botan-ct
+BOTAN_LINK    = -I$(BOTAN)/include/botan-3 $(BOTAN)/lib/libbotan-3.a -lpthread
+BOTAN_CT_LINK = -I$(BOTAN_CT)/include/botan-3 -I$(BUILD_DIR)/botan-ct.build/build/include/internal \
+                -I$(BUILD_DIR)/botan-ct.build/build $(BOTAN_CT)/lib/libbotan-3.a -lpthread
+BOTAN_TOOLS = $(if $(wildcard $(BOTAN)/lib/libbotan-3.a),bin/bench_botan bin/botan_kemtool bin/botan_hs_client bin/dudect_botan) \
+              $(if $(wildcard $(BOTAN_CT)/lib/libbotan-3.a),bin/botan_ct_kem)
+TOOLS   += $(BOTAN_TOOLS)
+
 .PHONY: help deps tools sysinfo kat bench tls ct kyber figures report all quick demo gui clean distclean
 
 help:
 	@echo "Targets:"
-	@echo "  deps       build OpenSSL 3.5, liboqs (ref/opt/ct) and oqs-provider into \$$BUILD_DIR"
+	@echo "  deps       build OpenSSL 3.5, liboqs (ref/opt/ct), oqs-provider and Botan 3 into \$$BUILD_DIR"
 	@echo "  tools      compile the C harnesses in bin/"
 	@echo "  kat        E4: correctness and interoperability checks"
 	@echo "  bench      E1: keygen/encaps/decaps timing, sizes, stack (COOLDOWN=30 on laptops)"
@@ -70,6 +84,26 @@ bin/dudect_kem-%: ct/dudect_kem.c ct/dudect_run.h ct/dudect/dudect.h $(HDRS)
 bin/dudect_planted: ct/dudect_planted.c ct/dudect_run.h ct/dudect/dudect.h $(HDRS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) $< -o $@ -lm
+
+bin/bench_botan: bench/bench_botan.cpp $(HDRS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK)
+
+bin/botan_kemtool: kat/botan_kemtool.cpp $(HDRS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK)
+
+bin/botan_hs_client: tls/botan_hs_client.cpp $(HDRS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK)
+
+bin/dudect_botan: ct/dudect_botan.cpp ct/dudect_run.h ct/dudect/dudect.h $(HDRS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK) -lm
+
+bin/botan_ct_kem: ct/botan_ct_kem.cpp $(HDRS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) -Wno-cpp $< -o $@ $(BOTAN_CT_LINK)
 
 kyber:
 	ct/build_kyber.sh

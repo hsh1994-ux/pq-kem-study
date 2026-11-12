@@ -21,8 +21,10 @@ class SizesPage extends StatelessWidget {
         if (r['op'] != 'keygen') continue;
         final alg = r['alg'] ?? '';
         final cur = byAlg[alg];
-        // Prefer liboqs rows (they also report the secret-key size).
-        if (cur == null || (cur['tier'] == 'openssl' && r['tier'] != 'openssl')) byAlg[alg] = r;
+        // Prefer liboqs rows: they report the secret-key size in the
+        // specification's format (Botan stores an ML-KEM key as its 64-byte seed).
+        bool oqs(Map<String, String>? x) => x != null && (x['tier'] == 'ref' || x['tier'] == 'opt');
+        if (cur == null || (!oqs(cur) && oqs(r))) byAlg[alg] = r;
       }
     }
     final algs = repo.catalog.sort(byAlg.keys);

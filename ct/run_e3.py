@@ -8,14 +8,18 @@ Three independent checks, each written to its own CSV in results/raw/:
                and a constant-time one that should not be; if the leaky
                control is missed, KEM verdicts on this machine are void
              * liboqs ref and opt builds for E3_KEMS
+             * Botan's implementation of the same KEMs (tier "botan"; no HQC)
              * KyberSlash control: pq-crystals Kyber768 before/after the fix,
                at -O0/-Os/-O2/-O3
   e3divscan  Static check: DIV instructions the compiler emitted in the
-             Kyber functions KyberSlash is about (poly_tomsg, poly_compress)
+             Kyber functions KyberSlash is about (poly_tomsg, poly_compress),
+             and in every function of Botan's ML-KEM code
   e3valgrind Secret-dependent branches/addresses found by Valgrind memcheck
              (liboqs' ct build + test_kem, random bytes marked secret), raw and
-             after applying liboqs' own list of known issues. Skipped with a
-             note when Valgrind or the ct build is missing.
+             after applying liboqs' own list of known issues; and Botan's
+             --with-valgrind build, where Botan's own CT::poison annotations
+             mark the secrets (column impl). Skipped with a note when Valgrind
+             or the ct builds are missing.
 
 Knobs: QUICK=1, DUDECT_SECONDS (per target, default 60), E3_KEMS (comma list).
 """
@@ -54,6 +58,9 @@ def budget(default):
 
 def dudect_once(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode == 3 and r.stdout.startswith("unsupported"):
+        print(f"  {'botan':<9} {cmd[1]:<28} not implemented in Botan")
+        return None
     line = next((l for l in r.stdout.splitlines() if l.startswith("RESULT,")), None)
     if not line:
         print(f"  ! {' '.join(cmd)} failed: {r.stderr.strip()[:200]}")
@@ -110,6 +117,15 @@ def run_dudect(kems):
             exe, b = str(pqlib.BIN / f"dudect_kem-{tier}"), str(budget(60))
             rows += dudect([exe, alg, b], {"opt_level": "O3"}, follow_up=[exe, alg, b, "ff"])
 
+    botan = pqlib.BIN / "dudect_botan"
+    if botan.exists():
+        print("Botan decapsulation (fixed vs random ciphertext):")
+        for alg in kems:
+            b = str(budget(60))
+            rows += dudect([str(botan), alg, b], {"opt_level": "O3"}, follow_up=[str(botan), alg, b, "ff"])
+    else:
+        print("  ! bin/dudect_botan missing: Botan dudect skipped")
+
     print("KyberSlash control (pq-crystals Kyber768 ref, before/after fix):")
     for variant in ("old", "fixed"):
         for opt in KYBER_OPTS:
@@ -144,6 +160,37 @@ def run_divscan():
                                                          capture_output=True, text=True).stdout.splitlines()[0]))
             print(f"  Kyber768-{variant}-{opt}: " +
                   ", ".join(f"{f}={counts.get(f, 0)}" for f in ("poly_tomsg", "poly_compress")))
+    return rows + run_divscan_botan(objdump)
+
+
+def run_divscan_botan(objdump):
+    """DIV instructions in Botan's ML-KEM object files, per function. Botan is
+    built with its default flags (-O3); its ML-KEM code is in the objects of
+    the kyber module (common code, ML-KEM, and the AVX2 path on x86-64)."""
+    objs = sorted((pqlib.BUILD / "botan.build" / "build" / "obj" / "lib").glob("pubkey_kyber_*.o"))
+    if not objs:
+        print("  ! Botan object files not found: skipping Botan DIV scan")
+        return []
+    fn_re = re.compile(r"^[0-9a-f]+ <(.+)>:$")  # demangled C++ names contain '<' and '>'
+    counts, fn = {}, None
+    for obj in objs:
+        out = subprocess.run([objdump, "-d", "-C", "--no-show-raw-insn", str(obj)],
+                             capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            m = fn_re.match(line)
+            if m:
+                fn = m.group(1)
+                counts.setdefault(fn, 0)
+            elif fn and DIV_RE.search(line + " "):
+                counts[fn] += 1
+    cc = subprocess.run([os.environ.get("CC", "cc"), "--version"], capture_output=True, text=True).stdout.splitlines()[0]
+    hits = {f: n for f, n in counts.items() if n}
+    rows = [dict(variant="botan", opt_level="default", function=f[:120], div_instructions=n, compiler=cc)
+            for f, n in sorted(hits.items())]
+    rows.append(dict(variant="botan", opt_level="default", function=f"(all {len(counts)} ML-KEM functions)",
+                     div_instructions=sum(counts.values()), compiler=cc))
+    print(f"  Botan ML-KEM: {sum(counts.values())} DIV instructions in {len(counts)} functions"
+          + (": " + ", ".join(f"{f[:60]}={n}" for f, n in hits.items()) if hits else ""))
     return rows
 
 
@@ -179,12 +226,39 @@ def run_valgrind(kems):
                 [str(ctdir / "passes" / f) for f in passes.get(alg, [])]
         raw = valgrind_run(exe, alg, [])
         known = valgrind_run(exe, alg, supps) if supps else raw
-        rows.append(dict(alg=alg, errors_raw=raw[0], contexts_raw=raw[1],
+        rows.append(dict(impl="liboqs", alg=alg, errors_raw=raw[0], contexts_raw=raw[1],
                          errors_after_upstream_suppressions=known[0],
                          upstream_known_issue=bool(issues.get(alg)),
                          valgrind_crashed=raw[2], functions=";".join(raw[3][:6])))
         print(f"  {alg:<26} raw contexts={raw[1]:>4}  after upstream suppressions errors={known[0]:>4}"
               f"  known issue upstream={bool(issues.get(alg))}" + ("  (valgrind crashed)" if raw[2] else ""))
+    return rows
+
+
+def run_valgrind_botan(kems):
+    """Botan's own annotations (build/botan-ct). No suppressions exist, so the
+    'after suppressions' column equals the raw one."""
+    exe = pqlib.BIN / "botan_ct_kem"
+    if not shutil.which("valgrind") or not exe.exists():
+        print("  ! Valgrind or bin/botan_ct_kem (needs build/botan-ct) missing: skipping Botan")
+        return []
+    # Positive control: a deliberate branch on a CT::poison'ed byte must be found.
+    errors, contexts, crashed, fns = valgrind_run(exe, "control", [])
+    rows = [dict(impl="botan", alg="control (planted secret branch)", errors_raw=errors, contexts_raw=contexts,
+                 errors_after_upstream_suppressions=errors, upstream_known_issue=False,
+                 valgrind_crashed=crashed, functions=";".join(fns[:6]))]
+    print(f"  botan  control (must be >= 1)       contexts={contexts:>4}")
+    if contexts < 1:
+        print("  !! Botan's CT::poison annotations are not active: Botan Valgrind results are void")
+    for alg in kems:
+        if subprocess.run([str(exe), alg], capture_output=True).returncode == 3:
+            print(f"  botan  {alg:<26} not implemented in Botan")
+            continue
+        errors, contexts, crashed, fns = valgrind_run(exe, alg, [])
+        rows.append(dict(impl="botan", alg=alg, errors_raw=errors, contexts_raw=contexts,
+                         errors_after_upstream_suppressions=errors, upstream_known_issue=False,
+                         valgrind_crashed=crashed, functions=";".join(fns[:6])))
+        print(f"  botan  {alg:<26} contexts={contexts:>4}  errors={errors:>4}" + ("  (valgrind crashed)" if crashed else ""))
     return rows
 
 
@@ -198,7 +272,8 @@ def main():
     if s:
         pqlib.write_csv(pqlib.results_path("e3divscan"), s)
     print("Valgrind (secret = all random bytes):")
-    v = run_valgrind([k for k in pqlib.kems()] if not pqlib.QUICK else kems[:3])
+    vk = [k for k in pqlib.kems()] if not pqlib.QUICK else kems[:3]
+    v = run_valgrind(vk) + run_valgrind_botan(vk)
     if v:
         pqlib.write_csv(pqlib.results_path("e3valgrind"), v)
 

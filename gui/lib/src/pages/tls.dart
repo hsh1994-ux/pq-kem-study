@@ -9,6 +9,10 @@ import '../widgets.dart';
 const _groupOrder = [
   'x25519', 'X25519MLKEM768', 'MLKEM512', 'MLKEM768', 'MLKEM1024', 'hqc1', 'hqc3', 'hqc5', //
   'frodo640shake', 'frodo976shake', 'frodo1344shake', 'mceliece348864',
+  // Botan's TLS stack (stack=botan): Botan group names, prefixed "botan:".
+  'botan:x25519', 'botan:x25519/ML-KEM-768', 'botan:ML-KEM-512', 'botan:ML-KEM-768', 'botan:ML-KEM-1024',
+  'botan:eFrodoKEM-640-SHAKE', 'botan:eFrodoKEM-976-SHAKE', 'botan:eFrodoKEM-1344-SHAKE',
+  'botan:HQC', 'botan:Classic-McEliece',
 ];
 
 double? _pct(List<double> s, double p) {

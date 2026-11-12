@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """E1 -- microbenchmarks (RQ1).
 
-Runs bin/bench_kem-{ref,opt} for every KEM in kems.conf, plus
-bin/bench_ossl for OpenSSL's own ML-KEM, X25519 (plain ECDH and DHKEM) and X25519MLKEM768,
+Runs bin/bench_kem-{ref,opt} for every KEM in kems.conf, bin/bench_botan
+for the same KEMs as implemented by Botan 3 (tier "botan"; Botan has no HQC),
+plus bin/bench_ossl for OpenSSL's own ML-KEM, X25519 (plain ECDH and DHKEM) and X25519MLKEM768,
 and writes results/raw/e1_<arch>_<time>.csv.
 
 Environment knobs:
@@ -12,7 +13,8 @@ Environment knobs:
   COOLDOWN=0    seconds to sleep between KEMs; use ~30 on a fanless laptop
   PIN_CPU=1     core to pin to with taskset (empty to disable)
   WARMUP_MS=200 busy-wait before the first timed operation of each process
-  KEMS=none     skip the liboqs KEMs (KEMS=a,b limits them to a subset)
+  KEMS=none     skip the liboqs and Botan KEMs (KEMS=a,b limits them to a subset)
+  E1_BOTAN=0    skip Botan
   E1_OSSL=a,b   only these OpenSSL algorithms (default: all of OSSL_ALGS)
   E1_APPEND=f   add the new rows to an existing results file f instead of
                 writing a new one (rows with the same tier/alg/op are
@@ -81,6 +83,8 @@ def calibrate() -> dict:
 def run_bench(cmd: list[str], env: dict) -> list[dict]:
     cmd = pinned(cmd)
     r = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    if r.returncode == 3 and r.stdout.startswith("unsupported"):
+        return []  # KEM not implemented by this library (HQC in Botan)
     if r.returncode != 0:
         print(f"  ! {' '.join(cmd)}: {r.stderr.strip()[:200]}")
         return []
@@ -141,6 +145,24 @@ def main():
             rows += got
             for r in got:
                 print(f"  {tier:<4} {alg:<26} {r['op']:<7} median {float(r['median_ns']) / 1000:10.1f} us"
+                      f"   ~{r['ghz_before']}-{r['ghz_after']} GHz")
+            print(f"       ({time.time() - t0:.0f}s)")
+            time.sleep(cooldown)
+
+    botan = pqlib.BIN / "bench_botan"
+    if kems and os.environ.get("E1_BOTAN", "1") != "0":
+        if not botan.exists():
+            print("  ! bin/bench_botan missing (run `make deps tools`): Botan skipped")
+        for alg in kems if botan.exists() else []:
+            nk = n_mce if "McEliece" in alg else n_ops
+            t0 = time.time()
+            got = run_bench([str(botan), alg, str(nk), str(n_ops)], env)
+            if not got:
+                print(f"  botan {alg:<25} not implemented in Botan")
+                continue
+            rows += got
+            for r in got:
+                print(f"  botan {alg:<25} {r['op']:<7} median {float(r['median_ns']) / 1000:10.1f} us"
                       f"   ~{r['ghz_before']}-{r['ghz_after']} GHz")
             print(f"       ({time.time() - t0:.0f}s)")
             time.sleep(cooldown)

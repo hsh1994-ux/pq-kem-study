@@ -17,7 +17,7 @@ class PerformancePage extends StatefulWidget {
 
 class _PerformancePageState extends State<PerformancePage> {
   Set<String> _files = {};
-  Set<String> _tiers = {'ref', 'opt', 'openssl'};
+  Set<String> _tiers = {'ref', 'opt', 'botan', 'openssl'};
   Set<String> _levels = {'0', '1', '3', '5'};
   String _op = 'encaps';
   E1Metric _metric = E1Metric.time;

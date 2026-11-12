@@ -5,7 +5,9 @@ Author: Hamdan Al-Jabri.
 
 The project compares four post-quantum KEM families (ML-KEM (FIPS 203), HQC, FrodoKEM and Classic
 McEliece) against the classical X25519 baseline and the deployed X25519MLKEM768 hybrid. It covers
-portable and CPU-optimised implementations on **both x86-64 and ARM64**.
+portable and CPU-optimised implementations on **both x86-64 and ARM64**, and a second, independent
+library: **Botan 3** (ML-KEM, FrodoKEM and Classic McEliece; Botan has no HQC), in all four
+experiments.
 
 | Research question | Experiment | `make` target | Output |
 | --- | --- | --- | --- |
@@ -26,9 +28,9 @@ Needs a C compiler, CMake ≥ 3.22 (< 4), Ninja, git, Python 3 with numpy/pandas
 `iproute2`, and optionally Valgrind and LaTeX.
 
 ```sh
-make deps      # build pinned OpenSSL, liboqs and oqs-provider into ./build (10-30 min, once)
+make deps      # build pinned OpenSSL, liboqs, oqs-provider and Botan into ./build (20-60 min, once)
 make quick     # smoke-test every experiment (~10 min); results are *_quick.csv, not for the report
-make all       # the full study (~1-2 h); set COOLDOWN=30 on a fanless laptop
+make all       # the full study (~2-3 h with Botan); set COOLDOWN=30 on a fanless laptop
 make report
 ```
 
@@ -57,8 +59,10 @@ x86-64 Linux, so both architectures run identical code.
 | `KEMS=ML-KEM-768,HQC-1` | E1, E4 | subset of `kems.conf` |
 | `N_OPS`, `N_MCE_KEYGEN`, `COOLDOWN`, `PIN_CPU` | E1 | iterations, McEliece keygens, pause between KEMs (s), core to pin |
 | `WARMUP_MS` | E1 | busy-wait before the first timed operation (default 200) |
-| `KEMS=none`, `E1_OSSL`, `E1_APPEND` | E1 | skip liboqs; only these OpenSSL algorithms; add the rows to an existing results file (from the same machine) instead of a new one |
+| `KEMS=none`, `E1_OSSL`, `E1_APPEND` | E1 | skip liboqs and Botan; only these OpenSSL algorithms; add the rows to an existing results file (from the same machine) instead of a new one |
+| `E1_BOTAN=0` | E1 | skip the Botan benchmarks |
 | `N_HS`, `E2_GROUPS`, `RTTS`, `LOSSES`, `MTU` | E2 | handshakes per cell, TLS groups, RTTs (ms), loss (%), MTU |
+| `E2_STACKS`, `E2_BOTAN_GROUPS` | E2 | TLS stacks (`openssl,botan`), groups for Botan in Botan's names |
 | `DUDECT_SECONDS`, `E3_KEMS` | E3 | time budget per dudect target, KEMs to test |
 
 ## Layout
@@ -68,10 +72,12 @@ versions.env          pinned upstream versions (recorded in every results file)
 kems.conf             the KEMs studied, in table/plot order
 scripts/              build_deps.sh, sysinfo.sh, pqlib.py (shared Python helpers)
 common/cpucycles.h    one timer: fenced RDTSC (x86-64), CNTVCT_EL0 (ARM64), clock_gettime (other)
-kat/                  E4: kemtool.c + run_e4.py
-bench/                E1: bench_kem.c (liboqs), bench_ossl.c (OpenSSL), run_e1.py
-tls/                  E2: hs_client.c + run_e2.py
-ct/                   E3: dudect harnesses, patched dudect, KyberSlash build, run_e3.py
+common/botan_kem.h    liboqs KEM names -> Botan key classes (shared by the Botan tools)
+kat/                  E4: kemtool.c (liboqs), botan_kemtool.cpp (Botan), run_e4.py
+bench/                E1: bench_kem.c (liboqs), bench_botan.cpp (Botan), bench_ossl.c (OpenSSL), run_e1.py
+tls/                  E2: hs_client.c (OpenSSL), botan_hs_client.cpp (Botan), run_e2.py
+ct/                   E3: dudect harnesses (liboqs, Botan), patched dudect, KyberSlash build,
+                      botan_ct_kem.cpp (Valgrind driver), run_e3.py
 analysis/             make_figures.py
 report/               LaTeX skeleton of the final report (tables/ is generated)
 docs/logs/            bi-weekly progress reports
@@ -118,6 +124,23 @@ results/raw/          one CSV per run, each starting with '# key=value' machine 
   about that CPU, not proof of safety.
 - dudect is vendored in `ct/dudect/` with a small portability patch (`portable.patch`). Upstream is
   public domain (Unlicense).
+- **Botan 3** (tag in `versions.env`) is built twice: `build/botan` (release, default module set so
+  all of Botan's SIMD paths are in; Botan chooses AVX2/NEON at run time) and `build/botan-ct`
+  (`--with-valgrind`). Where it appears:
+  - **E1**, tier `botan`: keygen = key pair + public key encoded to bytes; encaps = public key parsed
+    from bytes + encapsulation (what a TLS server does); decaps = on the key object from keygen (what a
+    TLS client does). OS RNG and raw shared secret, as for liboqs. Botan keeps buffers on the heap,
+    so its stack numbers are small and not comparable; its ML-KEM secret key size is the 64-byte seed.
+  - **E2**, `stack=botan`: Botan's TLS 1.3 client (`bin/botan_hs_client`) against Botan's own server
+    (`botan tls_server`), in the same delay/loss cells as OpenSSL. Botan's FrodoKEM TLS groups are
+    **eFrodoKEM** (the ephemeral variant without salt), so they are not the same parameter sets as
+    oqs-provider's `frodo*` groups and the two stacks cannot negotiate FrodoKEM with each other.
+  - **E3**: dudect on Botan's decapsulation (tier `botan`), DIV instructions in Botan's ML-KEM object
+    code, and Valgrind with Botan's **own** `CT::poison` annotations (`impl=botan`). liboqs is checked
+    differently (all random bytes secret, then its known-issue list), so compare the two with care.
+  - **E4**: Botan's own KAT suites (`botan-test`), the NIST ACVP vectors through Botan, Botan round
+    trips, **liboqs <-> Botan** key exchange in both directions, and **OpenSSL <-> Botan** TLS 1.3
+    handshakes for the groups both offer (x25519, X25519MLKEM768, ML-KEM-512/768/1024).
 
 ## Tools and assistance
 

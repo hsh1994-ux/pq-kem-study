@@ -34,9 +34,9 @@ INCLUDE_QUICK = os.environ.get("INCLUDE_QUICK", "0") == "1"
 
 # Validated palette (dataviz reference instance, light mode): categorical
 # slots 1-3 pass all-pairs CVD checks; ordinal ramp = blue 250/450/650.
-TIER_COLOR = {"ref": "#2a78d6", "opt": "#eb6834", "openssl": "#1baf7a"}
+TIER_COLOR = {"ref": "#2a78d6", "opt": "#eb6834", "openssl": "#1baf7a", "botan": "#8f5bd6"}
 TIER_LABEL = {"ref": "liboqs portable C (ref)", "opt": "liboqs optimised (opt)",
-              "openssl": "OpenSSL 3.5 native"}
+              "openssl": "OpenSSL 3.5 native", "botan": "Botan 3"}
 LOSS_COLOR = ["#86b6ef", "#2a78d6", "#104281"]
 INK, INK2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
@@ -128,7 +128,7 @@ def e1():
         for c, op in enumerate(ops):
             ax = axes[r][c]
             sub = d[d.op == op]
-            tiers = [t for t in ("ref", "opt", "openssl") if t in set(sub.tier)]
+            tiers = [t for t in ("ref", "opt", "botan", "openssl") if t in set(sub.tier)]
             w = 0.8 / len(tiers)
             for i, t in enumerate(tiers):
                 s = sub[sub.tier == t].set_index("alg")
@@ -144,8 +144,11 @@ def e1():
                 ax.set_ylabel("median time (µs, log scale)")
     fig.suptitle("E1: median cost per operation (log scale)", fontsize=9, x=0.01, ha="left", color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    h, l = axes[0][0].get_legend_handles_labels()
-    fig.legend(h, l, loc="upper right", ncol=len(l), fontsize=7)
+    legend = {}  # union over all panels: one machine may have tiers the other lacks
+    for ax in axes.flat:
+        for h, l in zip(*ax.get_legend_handles_labels()):
+            legend.setdefault(l, h)
+    fig.legend(list(legend.values()), list(legend.keys()), loc="upper right", ncol=len(legend), fontsize=7)
     save(fig, "fig_e1_ops")
 
     for arch, d in sorted(runs.items()):
@@ -241,9 +244,12 @@ def e3():
         fig.tight_layout()
         save(fig, "fig_e3_dudect")
     for arch, v in sorted(latest("e3valgrind").items()):
-        v = v[["alg", "contexts_raw", "errors_after_upstream_suppressions", "upstream_known_issue", "functions"]]
+        if "impl" not in v:  # files from before Botan was added
+            v = v.assign(impl="liboqs")
+        v = v[["impl", "alg", "contexts_raw", "errors_after_upstream_suppressions", "upstream_known_issue", "functions"]]
         v = v.assign(functions=v.functions.fillna("").str.replace(";", ", ").str.slice(0, 60))
-        v.columns = ["KEM", "findings (contexts)", "after upstream suppressions", "known upstream", "first functions"]
+        v.columns = ["library", "KEM", "findings (contexts)", "after upstream suppressions", "known upstream",
+                     "first functions"]
         write_tex(f"tab_e3_valgrind_{arch}", v, f"E3 Valgrind secret-dependence findings ({arch}).",
                   f"tab:e3-valgrind-{arch}", fmt=lambda x: f"{x:,.0f}")
     for arch, s in sorted(latest("e3divscan").items()):
@@ -259,7 +265,8 @@ def e4():
         tot = d.pivot_table(index="alg", columns="check", values="total", aggfunc="sum", sort=False)
         cell = p.astype("Int64").astype(str) + "/" + tot.astype("Int64").astype(str)
         cell = cell.where(tot.notna(), "--").reset_index().rename(columns={"alg": "KEM"})
-        write_tex(f"tab_e4_{arch}", cell, f"E4 correctness checks passed, summed over the ref and opt builds ({arch}).", f"tab:e4-{arch}")
+        write_tex(f"tab_e4_{arch}", cell, f"E4 correctness checks passed, summed over the ref and opt builds "
+                  f"and Botan ({arch}).", f"tab:e4-{arch}")
 
 
 if __name__ == "__main__":

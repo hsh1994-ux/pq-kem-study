@@ -54,5 +54,6 @@ cat <<EOF
 # liboqs=$LIBOQS_TAG
 # openssl=$OPENSSL_TAG
 # oqs_provider=$OQSPROVIDER_TAG
+# botan=$BOTAN_TAG
 # repo_commit=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo none)
 EOF

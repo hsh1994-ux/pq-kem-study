@@ -14,8 +14,15 @@ Inside the namespace:
     lo once, so RTT = 2 x delay, and loss applies in both directions)
   * one `openssl s_server` offers all groups; bin/hs_client offers exactly
     one group per run, so that group is what gets negotiated
+  * the same again with Botan's TLS 1.3 stack: `botan tls_server` (Botan's
+    CLI) and bin/botan_hs_client, under the same delay/loss, in the same cell.
+    Botan rows have stack=botan and group "botan:<Botan group name>". Botan's
+    FrodoKEM TLS groups are eFrodoKEM (the ephemeral variant, no salt): a
+    slightly smaller ciphertext than the FrodoKEM of E1/E4. Botan has no HQC
+    and, like everyone, no Classic McEliece TLS group.
 
 Environment knobs: QUICK=1, N_HS (handshakes per cell), E2_GROUPS (comma list),
+E2_BOTAN_GROUPS (comma list, Botan names), E2_STACKS (default openssl,botan),
 RTTS (ms, comma list), LOSSES (%, comma list), MTU (default 1500).
 Writes results/raw/e2_<arch>_<time>.csv.
 """
@@ -33,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import pqlib  # noqa: E402
 
 PORT = 4433
+BOTAN_PORT = 4434
 # Classical baseline, deployed hybrid, pure ML-KEM (OpenSSL native), then
 # oqs-provider groups. Unavailable groups are recorded as such, not dropped.
 DEFAULT_GROUPS = [
@@ -43,6 +51,13 @@ DEFAULT_GROUPS = [
     # ClientHello key share (max 65,535 bytes). Kept so the CSV records it.
     "mceliece348864",
 ]
+BOTAN_GROUPS = [
+    "x25519", "x25519/ML-KEM-768", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024",
+    "eFrodoKEM-640-SHAKE", "eFrodoKEM-976-SHAKE", "eFrodoKEM-1344-SHAKE",
+]
+# Recorded as rows with a note, so the CSV says why they are missing.
+BOTAN_NOT_AVAILABLE = {"HQC": "not implemented in Botan",
+                       "Classic-McEliece": "group not available in TLS"}
 FIELDS = ["group", "i", "ok", "tcp_ns", "tls_ns", "total_ns", "bytes_sent", "bytes_received"]
 
 
@@ -93,14 +108,46 @@ def available_groups() -> set[str]:
     return {g.strip() for g in out.replace("\n", ":").split(":") if g.strip()}
 
 
-def wait_port(port, timeout=10):
+def wait_port(port, timeout=10, what="s_server"):
     t0 = time.time()
     while time.time() - t0 < timeout:
         with socket.socket() as s:
             if s.connect_ex(("127.0.0.1", port)) == 0:
                 return
         time.sleep(0.1)
-    raise SystemExit("s_server did not start")
+    raise SystemExit(f"{what} did not start")
+
+
+def botan_cli() -> Path:
+    return pqlib.BUILD / "botan" / "bin" / "botan"
+
+
+def start_botan_server(tmp, crt, key, groups):
+    """Botan's own TLS 1.3 server (its CLI), offering every Botan group."""
+    policy = Path(tmp, "botan_server.policy")
+    policy.write_text("allow_tls12 = false\nallow_tls13 = true\n"
+                      f"key_exchange_groups = {' '.join(groups)}\n"
+                      "new_session_tickets_upon_handshake_success = 0\n")
+    p = subprocess.Popen([str(botan_cli()), "tls_server", str(crt), str(key), f"--port={BOTAN_PORT}",
+                          f"--policy={policy}"],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    wait_port(BOTAN_PORT, what="botan tls_server")
+    return p
+
+
+def handshakes(client, port, group, n_hs, label, rtt, loss, mtu, stack):
+    """Run one client for one group in the current netem cell; returns CSV rows."""
+    r = subprocess.run([str(client), "127.0.0.1", str(port), group, str(n_hs)],
+                       capture_output=True, text=True, env=pqlib.openssl_env(), timeout=900)
+    got = list(csv.DictReader(io.StringIO(r.stdout), fieldnames=FIELDS))
+    oks = [x for x in got if x["ok"] == "1"]
+    med = sorted(int(x["total_ns"]) for x in oks)[len(oks) // 2] / 1e6 if oks else float("nan")
+    sent = oks[0]["bytes_sent"] if oks else "-"
+    print(f"  RTT {rtt:5.0f} ms loss {loss:3.0f}%  {label:<26} "
+          f"{len(oks)}/{n_hs} ok  median {med:8.2f} ms  client sent {sent} B")
+    return [dict(stack=stack, group=label, rtt_ms=rtt, loss_pct=loss, mtu=mtu, i=x["i"], ok=x["ok"],
+                 tcp_ns=x["tcp_ns"], tls_ns=x["tls_ns"], total_ns=x["total_ns"],
+                 bytes_sent=x["bytes_sent"], bytes_received=x["bytes_received"], note="") for x in got]
 
 
 def netem_available() -> bool:
@@ -127,6 +174,11 @@ def main():
     mtu = int(os.environ.get("MTU", 1500))
     # E2_GROUPS, not GROUPS: bash has a read-only GROUPS variable, so GROUPS=... never arrives.
     groups = csv_list("E2_GROUPS", DEFAULT_GROUPS)
+    stacks = csv_list("E2_STACKS", ["openssl", "botan"])
+    bgroups = csv_list("E2_BOTAN_GROUPS", BOTAN_GROUPS)
+    if "botan" in stacks and not (botan_cli().exists() and (pqlib.BIN / "botan_hs_client").exists()):
+        print("  ! Botan (build/botan/bin/botan or bin/botan_hs_client) missing: Botan stack skipped")
+        stacks = [x for x in stacks if x != "botan"]
 
     sh("ip", "link", "set", "lo", "up")
     sh("ip", "link", "set", "lo", "mtu", mtu)
@@ -135,17 +187,22 @@ def main():
         print("  ! tc netem is not available in this kernel: only RTT 0 / loss 0 is measured.")
         print("    (Run on a kernel with sch_netem, e.g. the Docker image or most Linux distros.)")
         rtts, losses = [0.0], [0.0]
-    have = available_groups()
-    usable = [g for g in groups if g in have]
-    missing = [g for g in groups if g not in have]
-    print(f"E2 on {pqlib.arch()}: {len(usable)} groups, RTT {rtts} ms, loss {losses} %, "
+    have = available_groups() if "openssl" in stacks else set()
+    usable = [g for g in groups if g in have] if "openssl" in stacks else []
+    missing = [g for g in groups if g not in have] if "openssl" in stacks else []
+    print(f"E2 on {pqlib.arch()}: stacks {stacks}, {len(usable)} OpenSSL + "
+          f"{len(bgroups) if 'botan' in stacks else 0} Botan groups, RTT {rtts} ms, loss {losses} %, "
           f"{n_hs} handshakes/cell, MTU {mtu}")
     if missing:
         print(f"  not offered by OpenSSL/oqs-provider: {', '.join(missing)}")
 
-    rows = [dict(group=g, rtt_ms="", loss_pct="", mtu=mtu, i="", ok=0, tcp_ns="", tls_ns="",
-                 total_ns="", bytes_sent="", bytes_received="", note="group not available in TLS")
-            for g in missing]
+    def note_row(stack, group, note):
+        return dict(stack=stack, group=group, rtt_ms="", loss_pct="", mtu=mtu, i="", ok=0, tcp_ns="", tls_ns="",
+                    total_ns="", bytes_sent="", bytes_received="", note=note)
+
+    rows = [note_row("openssl", g, "group not available in TLS") for g in missing]
+    if "botan" in stacks:
+        rows += [note_row("botan", f"botan:{fam}", why) for fam, why in BOTAN_NOT_AVAILABLE.items()]
 
     with tempfile.TemporaryDirectory() as tmp:
         key, crt = Path(tmp, "key.pem"), Path(tmp, "cert.pem")
@@ -153,41 +210,36 @@ def main():
         sh(pqlib.openssl_bin(), "req", "-x509", "-newkey", "ec", "-pkeyopt",
            "ec_paramgen_curve:P-256", "-nodes", "-keyout", key, "-out", crt,
            "-days", "30", "-subj", "/CN=pq-kem-study")
-        server = subprocess.Popen(
-            [pqlib.openssl_bin(), "s_server", "-accept", str(PORT), "-cert", str(crt),
-             "-key", str(key), "-tls1_3", "-num_tickets", "0", "-quiet",
-             "-groups", ":".join(usable), "-provider", "default", "-provider", "oqsprovider"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            env=pqlib.openssl_env())
+        servers = []
         try:
-            wait_port(PORT)
+            if "openssl" in stacks:
+                servers.append(subprocess.Popen(
+                    [pqlib.openssl_bin(), "s_server", "-accept", str(PORT), "-cert", str(crt),
+                     "-key", str(key), "-tls1_3", "-num_tickets", "0", "-quiet",
+                     "-groups", ":".join(usable), "-provider", "default", "-provider", "oqsprovider"],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    env=pqlib.openssl_env()))
+                wait_port(PORT)
+            if "botan" in stacks:
+                servers.append(start_botan_server(tmp, crt, key, bgroups))
+            # Both stacks are measured in the same netem cell, one after the other.
             for rtt in rtts:
                 for loss in losses:
                     set_netem(rtt, loss)
                     for g in usable:
-                        r = subprocess.run(
-                            [str(pqlib.BIN / "hs_client"), "127.0.0.1", str(PORT), g, str(n_hs)],
-                            capture_output=True, text=True, env=pqlib.openssl_env(),
-                            timeout=600)
-                        got = list(csv.DictReader(io.StringIO(r.stdout), fieldnames=FIELDS))
-                        oks = [x for x in got if x["ok"] == "1"]
-                        med = sorted(int(x["total_ns"]) for x in oks)[len(oks) // 2] / 1e6 if oks else float("nan")
-                        sent = oks[0]["bytes_sent"] if oks else "-"
-                        print(f"  RTT {rtt:5.0f} ms loss {loss:3.0f}%  {g:<16} "
-                              f"{len(oks)}/{n_hs} ok  median {med:8.2f} ms  client sent {sent} B")
-                        for x in got:
-                            rows.append(dict(group=x["group"], rtt_ms=rtt, loss_pct=loss, mtu=mtu,
-                                             i=x["i"], ok=x["ok"], tcp_ns=x["tcp_ns"],
-                                             tls_ns=x["tls_ns"], total_ns=x["total_ns"],
-                                             bytes_sent=x["bytes_sent"],
-                                             bytes_received=x["bytes_received"], note=""))
+                        rows += handshakes(pqlib.BIN / "hs_client", PORT, g, n_hs, g, rtt, loss, mtu, "openssl")
+                    if "botan" in stacks:
+                        for g in bgroups:
+                            rows += handshakes(pqlib.BIN / "botan_hs_client", BOTAN_PORT, g, n_hs,
+                                               f"botan:{g}", rtt, loss, mtu, "botan")
         finally:
-            server.terminate()
+            for p in servers:
+                p.terminate()
             set_netem(0, 0)
 
     pqlib.write_csv(pqlib.results_path("e2"), rows,
                     {"n_hs": n_hs, "mtu": mtu, "netem": "yes" if netem else "unavailable",
-                     "cert": "ECDSA P-256 self-signed"})
+                     "cert": "ECDSA P-256 self-signed", "stacks": "+".join(stacks)})
 
 
 if __name__ == "__main__":

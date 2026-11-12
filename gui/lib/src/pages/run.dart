@@ -419,6 +419,10 @@ const _moreVars = [
   _Var('RTTS=0,50,200', 'E2', 'Round-trip delays to emulate, in ms (tc netem).'),
   _Var('LOSSES=0,1,3', 'E2', 'Packet-loss rates to emulate, in percent.'),
   _Var('E2_GROUPS=x25519,X25519MLKEM768,MLKEM768', 'E2', 'TLS key-exchange groups to test (default: all of them).'),
+  _Var('E1_BOTAN=0', 'E1', 'Skip the Botan 3 benchmarks (default: run them for every KEM Botan has).'),
+  _Var('E2_STACKS=openssl', 'E2', 'TLS stacks to test: openssl, botan, or both (default: openssl,botan).'),
+  _Var('E2_BOTAN_GROUPS=x25519,x25519/ML-KEM-768', 'E2', 'Key-exchange groups for the Botan TLS stack, in '
+      'Botan\'s names (default: all eight).'),
   _Var('MTU=1500', 'E2', 'Packet size limit on the emulated link; 1500 is normal Ethernet.'),
 ];
 
