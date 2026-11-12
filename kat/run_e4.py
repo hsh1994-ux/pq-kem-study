@@ -20,6 +20,7 @@ Botan 3 (second independent implementation; no HQC in Botan):
   tls       OpenSSL <-> Botan TLS 1.3 handshakes, both directions, for every
             key-exchange group both stacks offer
 HQC rows for Botan are recorded as SKIP (not implemented in Botan).
+BOTAN_ONLY=1: only the Botan checks, merged into this machine's newest E4 file.
 
 Writes results/raw/e4_<arch>_<time>.csv; exits 1 if anything failed.
 """
@@ -239,8 +240,7 @@ TLS_PAIRS = {"x25519": "x25519", "X25519MLKEM768": "x25519/ML-KEM-768",
 
 
 def free_port() -> int:
-    """A currently unused TCP port (botan tls_server does not set SO_REUSEADDR,
-    so a fixed port can still be in TIME_WAIT from a previous run)."""
+    """A currently unused TCP port, so a re-run never trips over TIME_WAIT."""
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
@@ -260,10 +260,9 @@ def check_tls_interop():
     """OpenSSL client -> Botan server and Botan client -> OpenSSL server, one
     TLS 1.3 handshake each way per group (3 tries allowed). Same ECDSA P-256
     certificate as E2; certificates are not verified (key exchange only)."""
-    botan = pqlib.BUILD / "botan" / "bin" / "botan"
-    oc, bc = pqlib.BIN / "hs_client", pqlib.BIN / "botan_hs_client"
-    if not (botan.exists() and oc.exists() and bc.exists()):
-        record("tls", "openssl<->botan", "(all)", 0, 0, "Botan CLI or TLS clients missing", status="SKIP")
+    bs, oc, bc = pqlib.BIN / "botan_hs_server", pqlib.BIN / "hs_client", pqlib.BIN / "botan_hs_client"
+    if not (bs.exists() and oc.exists() and bc.exists()):
+        record("tls", "openssl<->botan", "(all)", 0, 0, "Botan TLS server/client missing", status="SKIP")
         return
     ossl, env = pqlib.openssl_bin(), pqlib.openssl_env()
     op = free_port()
@@ -271,18 +270,15 @@ def check_tls_interop():
     while bp == op:
         bp = free_port()
     with tempfile.TemporaryDirectory() as tmp:
-        key, crt, pol = Path(tmp, "key.pem"), Path(tmp, "cert.pem"), Path(tmp, "botan.policy")
+        key, crt = Path(tmp, "key.pem"), Path(tmp, "cert.pem")
         run([ossl, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes",
              "-keyout", key, "-out", crt, "-days", "30", "-subj", "/CN=pq-kem-study"], env=env)
-        pol.write_text("allow_tls12 = false\nallow_tls13 = true\n"
-                       f"key_exchange_groups = {' '.join(TLS_PAIRS.values())}\n"
-                       "new_session_tickets_upon_handshake_success = 0\n")
         servers = [
             subprocess.Popen([ossl, "s_server", "-accept", str(op), "-cert", str(crt), "-key", str(key),
                               "-tls1_3", "-num_tickets", "0", "-quiet", "-groups", ":".join(TLS_PAIRS),
                               "-provider", "default"], env=env, stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
-            subprocess.Popen([str(botan), "tls_server", str(crt), str(key), f"--port={bp}", f"--policy={pol}"],
+            subprocess.Popen([str(bs), str(crt), str(key), str(bp)] + list(TLS_PAIRS.values()),
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)]
         try:
             if not (wait_port(op) and wait_port(bp)):
@@ -307,14 +303,16 @@ def main():
     kats = json.loads((pqlib.BUILD / "src" / "liboqs" / "tests" / "KATs" / "kem" / "kats.json").read_text())
     algs = pqlib.kems()
     print(f"E4 correctness on {pqlib.arch()}: {len(algs)} KEMs x {len(pqlib.TIERS)} builds")
-    for tier in pqlib.TIERS:
+    if pqlib.BOTAN_ONLY:
+        print("  BOTAN_ONLY: only the Botan checks; rows go into the newest E4 file")
+    for tier in pqlib.TIERS if not pqlib.BOTAN_ONLY else []:
         for alg in algs:
             check_kat(tier, alg, kats)
             check_selftest(tier, alg)
             if alg in ML_KEM:
                 check_acvp(tier, alg)
     with tempfile.TemporaryDirectory() as tmp:
-        for alg in algs:
+        for alg in algs if not pqlib.BOTAN_ONLY else []:
             d = Path(tmp) / alg
             d.mkdir()
             check_cross(alg, d)
@@ -337,8 +335,10 @@ def main():
         check_tls_interop()
     else:
         print("  (bin/botan_kemtool missing: Botan checks skipped; run `make deps tools`)")
-    out = pqlib.results_path("e4")
-    pqlib.write_csv(out, rows)
+    if pqlib.BOTAN_ONLY:  # Botan rows: anything Botan took part in
+        pqlib.merge_rows("e4", rows, lambda r: "botan" in r["tier"])
+    else:
+        pqlib.write_csv(pqlib.results_path("e4"), rows)
     failed = [r for r in rows if r["status"] not in ("PASS", "SKIP")]
     print(f"E4: {len(rows) - len(failed)}/{len(rows)} checks passed (or skipped as not applicable)")
     sys.exit(1 if failed else 0)

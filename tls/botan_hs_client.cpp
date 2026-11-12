@@ -13,7 +13,9 @@
  * tls_ns runs from creating the TLS client (which sends the ClientHello) to
  * the moment Botan reports the session active (server Finished verified,
  * client Finished sent). No session resumption (Session_Manager_Noop); the
- * certificate is not verified: E2 measures key exchange, not PKI.
+ * certificate is not verified: E2 measures key exchange, not PKI. Each flight
+ * is written with one send() and TCP_NODELAY is set, like hs_client; the
+ * server side is bin/botan_hs_server.
  */
 #include <arpa/inet.h>
 #include <linux/tcp.h>
@@ -60,16 +62,19 @@ class Callbacks final : public Botan::TLS::Callbacks {
     explicit Callbacks(int fd) : m_fd(fd) {}
     bool active = false, failed = false;
 
-    void tls_emit_data(std::span<const uint8_t> data) override {
+    /* Collect a whole flight and write it with one send(), as OpenSSL does. */
+    void tls_emit_data(std::span<const uint8_t> data) override { m_out.insert(m_out.end(), data.begin(), data.end()); }
+    void flush() {
         size_t off = 0;
-        while (off < data.size()) {
-            ssize_t w = send(m_fd, data.data() + off, data.size() - off, MSG_NOSIGNAL);
+        while (off < m_out.size()) {
+            ssize_t w = send(m_fd, m_out.data() + off, m_out.size() - off, MSG_NOSIGNAL);
             if (w <= 0) {
                 failed = true;
-                return;
+                break;
             }
             off += (size_t)w;
         }
+        m_out.clear();
     }
     void tls_record_received(uint64_t, std::span<const uint8_t>) override {}
     void tls_alert(Botan::TLS::Alert alert) override {
@@ -86,6 +91,7 @@ class Callbacks final : public Botan::TLS::Callbacks {
 
   private:
     int m_fd;
+    std::vector<uint8_t> m_out;
 };
 
 }  // namespace
@@ -126,11 +132,13 @@ int main(int argc, char **argv) {
                 Botan::TLS::Client client(cb, sessions, creds, policy, rng,
                                           Botan::TLS::Server_Information("", (uint16_t)std::atoi(port)),
                                           Botan::TLS::Protocol_Version::TLS_V13);
+                cb->flush(); /* ClientHello */
                 uint8_t buf[16384];
                 while (!cb->active && !cb->failed && !client.is_closed()) {
                     ssize_t r = recv(fd, buf, sizeof buf, 0);
                     if (r <= 0) break;
                     client.received_data(std::span<const uint8_t>(buf, (size_t)r));
+                    cb->flush();
                 }
                 ok = cb->active && !cb->failed;
             } catch (const std::exception &e) {

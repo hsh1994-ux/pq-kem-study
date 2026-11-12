@@ -21,6 +21,9 @@ Three independent checks, each written to its own CSV in results/raw/:
              mark the secrets (column impl). Skipped with a note when Valgrind
              or the ct builds are missing.
 
+BOTAN_ONLY=1 runs only the Botan parts and merges them into this machine's
+newest e3dudect/e3divscan/e3valgrind files.
+
 Knobs: QUICK=1, DUDECT_SECONDS (per target, default 60), E3_KEMS (comma list).
 """
 import csv
@@ -110,9 +113,12 @@ def run_dudect(kems):
     leaky = next((r for r in rows if r["target"] == "planted-leaky-memcmp"), None)
     if not leaky or leaky["verdict"] != "leak":
         print("  !! planted leak NOT detected: timing results on this machine are not trustworthy")
+    if pqlib.BOTAN_ONLY:
+        rows = []  # controls were checked for this session; the file keeps its original ones
 
-    print("liboqs decapsulation (fixed vs random ciphertext):")
-    for tier in pqlib.TIERS:
+    if not pqlib.BOTAN_ONLY:
+        print("liboqs decapsulation (fixed vs random ciphertext):")
+    for tier in pqlib.TIERS if not pqlib.BOTAN_ONLY else []:
         for alg in kems:
             exe, b = str(pqlib.BIN / f"dudect_kem-{tier}"), str(budget(60))
             rows += dudect([exe, alg, b], {"opt_level": "O3"}, follow_up=[exe, alg, b, "ff"])
@@ -126,6 +132,8 @@ def run_dudect(kems):
     else:
         print("  ! bin/dudect_botan missing: Botan dudect skipped")
 
+    if pqlib.BOTAN_ONLY:
+        return rows
     print("KyberSlash control (pq-crystals Kyber768 ref, before/after fix):")
     for variant in ("old", "fixed"):
         for opt in KYBER_OPTS:
@@ -265,6 +273,18 @@ def run_valgrind_botan(kems):
 def main():
     kems = [k for k in os.environ.get("E3_KEMS", ",".join(DEFAULT_E3_KEMS)).split(",") if k]
     print(f"E3 on {pqlib.arch()}: dudect budget {budget(60):.0f}s per target")
+    vk = [k for k in pqlib.kems()] if not pqlib.QUICK else kems[:3]
+    if pqlib.BOTAN_ONLY:
+        print("BOTAN_ONLY: only Botan; rows go into this machine's newest E3 files")
+        pqlib.merge_rows("e3dudect", run_dudect(kems), lambda r: r["tier"] == "botan")
+        print("DIV instructions in Botan's ML-KEM code:")
+        objdump = shutil.which("objdump")
+        pqlib.merge_rows("e3divscan", run_divscan_botan(objdump) if objdump else [],
+                         lambda r: r["variant"] == "botan")
+        print("Valgrind (Botan's own annotations):")
+        pqlib.merge_rows("e3valgrind", run_valgrind_botan(vk), lambda r: r.get("impl") == "botan",
+                         defaults={"impl": "liboqs"})
+        return
     d = run_dudect(kems)
     pqlib.write_csv(pqlib.results_path("e3dudect"), d, {"dudect_seconds": budget(60)})
     print("DIV instructions in KyberSlash-relevant functions:")
@@ -272,7 +292,6 @@ def main():
     if s:
         pqlib.write_csv(pqlib.results_path("e3divscan"), s)
     print("Valgrind (secret = all random bytes):")
-    vk = [k for k in pqlib.kems()] if not pqlib.QUICK else kems[:3]
     v = run_valgrind(vk) + run_valgrind_botan(vk)
     if v:
         pqlib.write_csv(pqlib.results_path("e3valgrind"), v)

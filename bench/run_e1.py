@@ -15,6 +15,7 @@ Environment knobs:
   WARMUP_MS=200 busy-wait before the first timed operation of each process
   KEMS=none     skip the liboqs and Botan KEMs (KEMS=a,b limits them to a subset)
   E1_BOTAN=0    skip Botan
+  BOTAN_ONLY=1  only the Botan benchmarks, merged into this machine's newest E1 file
   E1_OSSL=a,b   only these OpenSSL algorithms (default: all of OSSL_ALGS)
   E1_APPEND=f   add the new rows to an existing results file f instead of
                 writing a new one (rows with the same tier/alg/op are
@@ -137,7 +138,10 @@ def main():
 
     kems = [] if os.environ.get("KEMS", "").strip().lower() == "none" else pqlib.kems()
     ossl_algs = [a.strip() for a in os.environ.get("E1_OSSL", "").split(",") if a.strip()] or OSSL_ALGS
-    for tier in pqlib.TIERS if kems else []:
+    if pqlib.BOTAN_ONLY:
+        print("  BOTAN_ONLY: liboqs and OpenSSL are skipped; Botan rows go into the newest E1 file")
+        ossl_algs = []
+    for tier in pqlib.TIERS if kems and not pqlib.BOTAN_ONLY else []:
         for alg in kems:
             nk = n_mce if "McEliece" in alg else n_ops
             t0 = time.time()
@@ -180,7 +184,9 @@ def main():
                            "ns_per_tick": cal["ns_per_tick"], "tick_mhz": cal["tick_mhz"],
                            "core_ghz_at_start": cal["core_ghz"]}
     target = os.environ.get("E1_APPEND", "").strip()
-    if target:
+    if pqlib.BOTAN_ONLY:
+        pqlib.merge_rows("e1", rows, lambda r: r["tier"] == "botan")
+    elif target:
         commit = subprocess.run(["git", "-C", str(pqlib.ROOT), "rev-parse", "--short", "HEAD"],
                                 capture_output=True, text=True).stdout.strip() or "none"
         algs = sorted({r["alg"] for r in rows})

@@ -31,6 +31,7 @@ Needs a C compiler, CMake ≥ 3.22 (< 4), Ninja, git, Python 3 with numpy/pandas
 make deps      # build pinned OpenSSL, liboqs, oqs-provider and Botan into ./build (20-60 min, once)
 make quick     # smoke-test every experiment (~10 min); results are *_quick.csv, not for the report
 make all       # the full study (~2-3 h with Botan); set COOLDOWN=30 on a fanless laptop
+make botan     # only the Botan parts of E1-E4, added to this machine's newest result files
 make report
 ```
 
@@ -63,6 +64,7 @@ x86-64 Linux, so both architectures run identical code.
 | `E1_BOTAN=0` | E1 | skip the Botan benchmarks |
 | `N_HS`, `E2_GROUPS`, `RTTS`, `LOSSES`, `MTU` | E2 | handshakes per cell, TLS groups, RTTs (ms), loss (%), MTU |
 | `E2_STACKS`, `E2_BOTAN_GROUPS` | E2 | TLS stacks (`openssl,botan`), groups for Botan in Botan's names |
+| `BOTAN_ONLY=1` | all | only the Botan parts; rows are merged into this machine's newest result file of each experiment (what `make botan` sets) |
 | `DUDECT_SECONDS`, `E3_KEMS` | E3 | time budget per dudect target, KEMs to test |
 
 ## Layout
@@ -131,8 +133,10 @@ results/raw/          one CSV per run, each starting with '# key=value' machine 
     from bytes + encapsulation (what a TLS server does); decaps = on the key object from keygen (what a
     TLS client does). OS RNG and raw shared secret, as for liboqs. Botan keeps buffers on the heap,
     so its stack numbers are small and not comparable; its ML-KEM secret key size is the 64-byte seed.
-  - **E2**, `stack=botan`: Botan's TLS 1.3 client (`bin/botan_hs_client`) against Botan's own server
-    (`botan tls_server`), in the same delay/loss cells as OpenSSL. Botan's FrodoKEM TLS groups are
+  - **E2**, `stack=botan`: Botan's TLS 1.3 client and server (`bin/botan_hs_client`,
+    `bin/botan_hs_server`), in the same delay/loss cells as OpenSSL. Both write each flight with one
+    `send()` and set `TCP_NODELAY`. (Botan's own `botan tls_server` demo writes every record
+    separately with Nagle on, which adds a full round trip to each handshake; it is not used.) Botan's FrodoKEM TLS groups are
     **eFrodoKEM** (the ephemeral variant without salt), so they are not the same parameter sets as
     oqs-provider's `frodo*` groups and the two stacks cannot negotiate FrodoKEM with each other.
   - **E3**: dudect on Botan's decapsulation (tier `botan`), DIV instructions in Botan's ML-KEM object

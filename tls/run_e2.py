@@ -14,8 +14,10 @@ Inside the namespace:
     lo once, so RTT = 2 x delay, and loss applies in both directions)
   * one `openssl s_server` offers all groups; bin/hs_client offers exactly
     one group per run, so that group is what gets negotiated
-  * the same again with Botan's TLS 1.3 stack: `botan tls_server` (Botan's
-    CLI) and bin/botan_hs_client, under the same delay/loss, in the same cell.
+  * the same again with Botan's TLS 1.3 stack: bin/botan_hs_server and
+    bin/botan_hs_client, under the same delay/loss, in the same cell. Both
+    write each flight with one send() and set TCP_NODELAY (Botan's own
+    `botan tls_server` demo does neither, which costs an extra round trip).
     Botan rows have stack=botan and group "botan:<Botan group name>". Botan's
     FrodoKEM TLS groups are eFrodoKEM (the ephemeral variant, no salt): a
     slightly smaller ciphertext than the FrodoKEM of E1/E4. Botan has no HQC
@@ -23,6 +25,7 @@ Inside the namespace:
 
 Environment knobs: QUICK=1, N_HS (handshakes per cell), E2_GROUPS (comma list),
 E2_BOTAN_GROUPS (comma list, Botan names), E2_STACKS (default openssl,botan),
+BOTAN_ONLY=1 (only the Botan stack, merged into this machine's newest E2 file),
 RTTS (ms, comma list), LOSSES (%, comma list), MTU (default 1500).
 Writes results/raw/e2_<arch>_<time>.csv.
 """
@@ -118,20 +121,11 @@ def wait_port(port, timeout=10, what="s_server"):
     raise SystemExit(f"{what} did not start")
 
 
-def botan_cli() -> Path:
-    return pqlib.BUILD / "botan" / "bin" / "botan"
-
-
-def start_botan_server(tmp, crt, key, groups):
-    """Botan's own TLS 1.3 server (its CLI), offering every Botan group."""
-    policy = Path(tmp, "botan_server.policy")
-    policy.write_text("allow_tls12 = false\nallow_tls13 = true\n"
-                      f"key_exchange_groups = {' '.join(groups)}\n"
-                      "new_session_tickets_upon_handshake_success = 0\n")
-    p = subprocess.Popen([str(botan_cli()), "tls_server", str(crt), str(key), f"--port={BOTAN_PORT}",
-                          f"--policy={policy}"],
+def start_botan_server(crt, key, groups):
+    """bin/botan_hs_server: Botan's TLS 1.3 stack, offering every Botan group."""
+    p = subprocess.Popen([str(pqlib.BIN / "botan_hs_server"), str(crt), str(key), str(BOTAN_PORT)] + groups,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    wait_port(BOTAN_PORT, what="botan tls_server")
+    wait_port(BOTAN_PORT, what="botan_hs_server")
     return p
 
 
@@ -174,10 +168,12 @@ def main():
     mtu = int(os.environ.get("MTU", 1500))
     # E2_GROUPS, not GROUPS: bash has a read-only GROUPS variable, so GROUPS=... never arrives.
     groups = csv_list("E2_GROUPS", DEFAULT_GROUPS)
-    stacks = csv_list("E2_STACKS", ["openssl", "botan"])
+    stacks = ["botan"] if pqlib.BOTAN_ONLY else csv_list("E2_STACKS", ["openssl", "botan"])
     bgroups = csv_list("E2_BOTAN_GROUPS", BOTAN_GROUPS)
-    if "botan" in stacks and not (botan_cli().exists() and (pqlib.BIN / "botan_hs_client").exists()):
-        print("  ! Botan (build/botan/bin/botan or bin/botan_hs_client) missing: Botan stack skipped")
+    if "botan" in stacks and not all((pqlib.BIN / t).exists() for t in ("botan_hs_client", "botan_hs_server")):
+        if pqlib.BOTAN_ONLY:
+            raise SystemExit("BOTAN_ONLY: bin/botan_hs_client or bin/botan_hs_server missing (run `make tools`)")
+        print("  ! bin/botan_hs_client or bin/botan_hs_server missing: Botan stack skipped")
         stacks = [x for x in stacks if x != "botan"]
 
     sh("ip", "link", "set", "lo", "up")
@@ -221,7 +217,7 @@ def main():
                     env=pqlib.openssl_env()))
                 wait_port(PORT)
             if "botan" in stacks:
-                servers.append(start_botan_server(tmp, crt, key, bgroups))
+                servers.append(start_botan_server(crt, key, bgroups))
             # Both stacks are measured in the same netem cell, one after the other.
             for rtt in rtts:
                 for loss in losses:
@@ -237,9 +233,13 @@ def main():
                 p.terminate()
             set_netem(0, 0)
 
-    pqlib.write_csv(pqlib.results_path("e2"), rows,
-                    {"n_hs": n_hs, "mtu": mtu, "netem": "yes" if netem else "unavailable",
-                     "cert": "ECDSA P-256 self-signed", "stacks": "+".join(stacks)})
+    if pqlib.BOTAN_ONLY:  # files from before Botan have no stack column: their rows are OpenSSL
+        pqlib.merge_rows("e2", rows, lambda r: r.get("stack") == "botan" or r["group"].startswith("botan:"),
+                         defaults={"stack": "openssl"})
+    else:
+        pqlib.write_csv(pqlib.results_path("e2"), rows,
+                        {"n_hs": n_hs, "mtu": mtu, "netem": "yes" if netem else "unavailable",
+                         "cert": "ECDSA P-256 self-signed", "stacks": "+".join(stacks)})
 
 
 if __name__ == "__main__":

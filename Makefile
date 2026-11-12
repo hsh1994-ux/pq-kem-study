@@ -27,11 +27,11 @@ BOTAN_CT = $(BUILD_DIR)/botan-ct
 BOTAN_LINK    = -I$(BOTAN)/include/botan-3 $(BOTAN)/lib/libbotan-3.a -lpthread
 BOTAN_CT_LINK = -I$(BOTAN_CT)/include/botan-3 -I$(BUILD_DIR)/botan-ct.build/build/include/internal \
                 -I$(BUILD_DIR)/botan-ct.build/build $(BOTAN_CT)/lib/libbotan-3.a -lpthread
-BOTAN_TOOLS = $(if $(wildcard $(BOTAN)/lib/libbotan-3.a),bin/bench_botan bin/botan_kemtool bin/botan_hs_client bin/dudect_botan) \
+BOTAN_TOOLS = $(if $(wildcard $(BOTAN)/lib/libbotan-3.a),bin/bench_botan bin/botan_kemtool bin/botan_hs_client bin/botan_hs_server bin/dudect_botan) \
               $(if $(wildcard $(BOTAN_CT)/lib/libbotan-3.a),bin/botan_ct_kem)
 TOOLS   += $(BOTAN_TOOLS)
 
-.PHONY: help deps tools sysinfo kat bench tls ct kyber figures report all quick demo gui clean distclean
+.PHONY: botan help deps tools sysinfo kat bench tls ct kyber figures report all quick demo gui clean distclean
 
 help:
 	@echo "Targets:"
@@ -43,7 +43,8 @@ help:
 	@echo "  ct         E3: dudect timing tests, KyberSlash control, DIV scan, Valgrind"
 	@echo "  figures    figures/ and report/tables/ from the newest results"
 	@echo "  report     figures + report/main.pdf (needs LaTeX)"
-	@echo "  all        kat bench tls ct figures (the full study, ~1-2 h)"
+	@echo "  all        kat bench tls ct figures (the full study, ~2-3 h)"
+	@echo "  botan      only the Botan parts of E1-E4, added to the newest result files"
 	@echo "  gui        open the results viewer (Flutter desktop app in gui/, needs Flutter)"
 	@echo "  quick      the same as smoke tests (~10 min, results not for the report)"
 	@echo "  demo       the mini-conference demo"
@@ -97,6 +98,10 @@ bin/botan_hs_client: tls/botan_hs_client.cpp $(HDRS)
 	@mkdir -p bin
 	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK)
 
+bin/botan_hs_server: tls/botan_hs_server.cpp $(HDRS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK)
+
 bin/dudect_botan: ct/dudect_botan.cpp ct/dudect_run.h ct/dudect/dudect.h $(HDRS)
 	@mkdir -p bin
 	$(CXX) $(CXXFLAGS) $< -o $@ $(BOTAN_LINK) -lm
@@ -127,6 +132,12 @@ report: figures
 	cd report && latexmk -pdf -interaction=nonstopmode -quiet main.tex
 
 all: kat bench tls ct figures
+
+# Only the Botan parts of E1-E4, merged into this machine's newest result files
+# (which keep their liboqs/OpenSSL rows). Same knobs as `all` (COOLDOWN, ...).
+botan:
+	$(MAKE) kat bench tls ct BOTAN_ONLY=1
+	analysis/make_figures.py
 
 quick:
 	$(MAKE) kat bench tls ct QUICK=1
