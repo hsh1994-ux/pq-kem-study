@@ -11,6 +11,7 @@
 # oqs_provider=0.12.0-rc2
 # repo_commit=e144cb6
 # dudect_seconds=60.0
+# botan_added_1=date 2026-11-12T13:15:28Z; botan 3.14.1; repo_commit a5907ce; rows 5; original run 2026-10-11T16:31:21Z
 tier,target,op,timer,measurements,max_t,verdict,seconds,tau,opt_level,replicate_max_t
 control,planted-leaky-memcmp,compare,tsc_cycles,14967,160.73,leak,0.2,1.3138,O2,
 control,planted-ct-memcmp,compare,tsc_cycles,848985,10.02,leak,8.5,0.0109,O2,
@@ -38,3 +39,8 @@ kyber-ref,Kyber768-fixed-O0,decaps,tsc_cycles,279692,1.78,no_evidence,61.5,0.003
 kyber-ref,Kyber768-fixed-Os,decaps,tsc_cycles,788382,2.74,no_evidence,60.3,0.0031,Os,
 kyber-ref,Kyber768-fixed-O2,decaps,tsc_cycles,510378,2.88,no_evidence,60.1,0.0040,O2,
 kyber-ref,Kyber768-fixed-O3,decaps,tsc_cycles,240671,3.00,no_evidence,60.4,0.0061,O3,
+botan,ML-KEM-512,decaps,tsc_cycles,3137249,1.21,no_evidence,60.2,0.0007,O3,
+botan,ML-KEM-768,decaps,tsc_cycles,1969496,1.97,no_evidence,60.4,0.0014,O3,
+botan,ML-KEM-1024,decaps,tsc_cycles,1739545,2.11,no_evidence,60.0,0.0016,O3,
+botan,FrodoKEM-640-SHAKE,decaps,tsc_cycles,43939,2.81,no_evidence,60.2,0.0134,O3,
+botan,Classic-McEliece-348864,decaps,tsc_cycles,1246,1.30,insufficient,63.5,0.0368,O3,

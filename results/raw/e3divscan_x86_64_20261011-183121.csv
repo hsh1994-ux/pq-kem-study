@@ -10,6 +10,7 @@
 # openssl=openssl-3.5.8
 # oqs_provider=0.12.0-rc2
 # repo_commit=e144cb6
+# botan_added_1=date 2026-11-12T13:15:28Z; botan 3.14.1; repo_commit a5907ce; rows 1; original run 2026-10-11T16:31:21Z
 variant,opt_level,function,div_instructions,compiler
 old,O0,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
 old,O0,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
@@ -27,3 +28,4 @@ fixed,O2,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
 fixed,O2,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
 fixed,O3,poly_tomsg,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
 fixed,O3,poly_compress,0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+botan,default,(all 235 ML-KEM functions),0,cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
